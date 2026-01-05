@@ -8,7 +8,7 @@ import {
   Tool,
 } from "@modelcontextprotocol/sdk/types.js";
 
-import { AdbClient } from "./adb/client.js";
+import { DeviceManager, Platform } from "./device-manager.js";
 import {
   parseUiHierarchy,
   findByText,
@@ -19,17 +19,29 @@ import {
   UiElement,
 } from "./adb/ui-parser.js";
 
-// Initialize ADB client
-const adb = new AdbClient();
+// Initialize device manager
+const deviceManager = new DeviceManager();
+
+// Platform parameter schema (reused across tools)
+const platformParam = {
+  type: "string",
+  enum: ["android", "ios"],
+  description: "Target platform. If not specified, uses the active device.",
+};
 
 // Define tools
 const tools: Tool[] = [
   {
     name: "list_devices",
-    description: "List all connected Android devices and emulators",
+    description: "List all connected Android devices/emulators and iOS simulators",
     inputSchema: {
       type: "object",
-      properties: {},
+      properties: {
+        platform: {
+          ...platformParam,
+          description: "Filter by platform (android/ios). If not specified, shows all.",
+        },
+      },
     },
   },
   {
@@ -42,21 +54,24 @@ const tools: Tool[] = [
           type: "string",
           description: "Device ID from list_devices",
         },
+        platform: platformParam,
       },
       required: ["deviceId"],
     },
   },
   {
     name: "screenshot",
-    description: "Take a screenshot of the Android device screen. Returns base64 encoded PNG image.",
+    description: "Take a screenshot of the device screen. Returns base64 encoded PNG image.",
     inputSchema: {
       type: "object",
-      properties: {},
+      properties: {
+        platform: platformParam,
+      },
     },
   },
   {
     name: "get_ui",
-    description: "Get the current UI hierarchy (accessibility tree). Shows all interactive elements with their text, IDs, and coordinates.",
+    description: "Get the current UI hierarchy (accessibility tree). Shows all interactive elements with their text, IDs, and coordinates. Note: Limited on iOS.",
     inputSchema: {
       type: "object",
       properties: {
@@ -65,6 +80,7 @@ const tools: Tool[] = [
           description: "Show all elements including non-interactive ones",
           default: false,
         },
+        platform: platformParam,
       },
     },
   },
@@ -84,16 +100,17 @@ const tools: Tool[] = [
         },
         text: {
           type: "string",
-          description: "Find element containing this text and tap it",
+          description: "Find element containing this text and tap it (Android only)",
         },
         resourceId: {
           type: "string",
-          description: "Find element with this resource ID and tap it",
+          description: "Find element with this resource ID and tap it (Android only)",
         },
         index: {
           type: "number",
-          description: "Tap element by index from get_ui output",
+          description: "Tap element by index from get_ui output (Android only)",
         },
+        platform: platformParam,
       },
     },
   },
@@ -113,13 +130,14 @@ const tools: Tool[] = [
         },
         text: {
           type: "string",
-          description: "Find element by text",
+          description: "Find element by text (Android only)",
         },
         duration: {
           type: "number",
           description: "Duration in milliseconds (default: 1000)",
           default: 1000,
         },
+        platform: platformParam,
       },
     },
   },
@@ -155,6 +173,7 @@ const tools: Tool[] = [
           description: "Duration in ms (default: 300)",
           default: 300,
         },
+        platform: platformParam,
       },
     },
   },
@@ -168,27 +187,29 @@ const tools: Tool[] = [
           type: "string",
           description: "Text to type",
         },
+        platform: platformParam,
       },
       required: ["text"],
     },
   },
   {
     name: "press_key",
-    description: "Press a key button (BACK, HOME, ENTER, TAB, DELETE, VOLUME_UP, VOLUME_DOWN, etc.)",
+    description: "Press a key button. Android: BACK, HOME, ENTER, etc. iOS: HOME, VOLUME_UP, VOLUME_DOWN",
     inputSchema: {
       type: "object",
       properties: {
         key: {
           type: "string",
-          description: "Key name: BACK, HOME, ENTER, TAB, DELETE, MENU, POWER, VOLUME_UP, VOLUME_DOWN, ESCAPE, SPACE, or numeric keycode",
+          description: "Key name: BACK, HOME, ENTER, TAB, DELETE, MENU, POWER, VOLUME_UP, VOLUME_DOWN, etc.",
         },
+        platform: platformParam,
       },
       required: ["key"],
     },
   },
   {
     name: "find_element",
-    description: "Find UI elements by text, resource ID, or other criteria",
+    description: "Find UI elements by text, resource ID, or other criteria (Android only)",
     inputSchema: {
       type: "object",
       properties: {
@@ -208,19 +229,21 @@ const tools: Tool[] = [
           type: "boolean",
           description: "Filter by clickable state",
         },
+        platform: platformParam,
       },
     },
   },
   {
     name: "launch_app",
-    description: "Launch an app by package name",
+    description: "Launch an app by package name (Android) or bundle ID (iOS)",
     inputSchema: {
       type: "object",
       properties: {
         package: {
           type: "string",
-          description: "Package name (e.g., com.android.settings)",
+          description: "Package name (Android) or bundle ID (iOS), e.g., com.android.settings or com.apple.Preferences",
         },
+        platform: platformParam,
       },
       required: ["package"],
     },
@@ -233,37 +256,41 @@ const tools: Tool[] = [
       properties: {
         package: {
           type: "string",
-          description: "Package name to stop",
+          description: "Package name (Android) or bundle ID (iOS)",
         },
+        platform: platformParam,
       },
       required: ["package"],
     },
   },
   {
-    name: "install_apk",
-    description: "Install an APK file",
+    name: "install_app",
+    description: "Install an app. APK for Android, .app bundle for iOS simulator",
     inputSchema: {
       type: "object",
       properties: {
         path: {
           type: "string",
-          description: "Path to APK file",
+          description: "Path to APK (Android) or .app bundle (iOS)",
         },
+        platform: platformParam,
       },
       required: ["path"],
     },
   },
   {
     name: "get_current_activity",
-    description: "Get the currently active app/activity",
+    description: "Get the currently active app/activity (Android only)",
     inputSchema: {
       type: "object",
-      properties: {},
+      properties: {
+        platform: platformParam,
+      },
     },
   },
   {
     name: "shell",
-    description: "Execute arbitrary ADB shell command",
+    description: "Execute shell command. ADB shell for Android, simctl for iOS",
     inputSchema: {
       type: "object",
       properties: {
@@ -271,6 +298,7 @@ const tools: Tool[] = [
           type: "string",
           description: "Shell command to execute",
         },
+        platform: platformParam,
       },
       required: ["command"],
     },
@@ -289,6 +317,21 @@ const tools: Tool[] = [
       },
     },
   },
+  {
+    name: "open_url",
+    description: "Open URL in device browser (iOS simulator only)",
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: {
+          type: "string",
+          description: "URL to open",
+        },
+        platform: platformParam,
+      },
+      required: ["url"],
+    },
+  },
 ];
 
 // Cache for UI elements (to support tap by index)
@@ -296,25 +339,51 @@ let cachedElements: UiElement[] = [];
 
 // Tool handlers
 async function handleTool(name: string, args: Record<string, unknown>): Promise<unknown> {
+  const platform = args.platform as Platform | undefined;
+
   switch (name) {
     case "list_devices": {
-      const devices = adb.getDevices();
+      const devices = deviceManager.getDevices(platform);
       if (devices.length === 0) {
-        return { text: "No devices connected. Make sure ADB is running and a device/emulator is connected." };
+        return { text: "No devices connected. Make sure ADB/Xcode is running and a device/emulator/simulator is connected." };
       }
-      const list = devices.map(d =>
-        `${d.id} - ${d.state}${d.model ? ` (${d.model})` : ""}`
-      ).join("\n");
-      return { text: `Connected devices:\n${list}` };
+
+      const activeDevice = deviceManager.getActiveDevice();
+
+      // Group by platform
+      const android = devices.filter(d => d.platform === "android");
+      const ios = devices.filter(d => d.platform === "ios");
+
+      let result = "Connected devices:\n";
+
+      if (android.length > 0) {
+        result += "\nAndroid:\n";
+        for (const d of android) {
+          const active = activeDevice?.id === d.id ? " [ACTIVE]" : "";
+          const type = d.isSimulator ? "emulator" : "physical";
+          result += `  • ${d.id} - ${d.name} (${type}, ${d.state})${active}\n`;
+        }
+      }
+
+      if (ios.length > 0) {
+        result += "\niOS:\n";
+        for (const d of ios) {
+          const active = activeDevice?.id === d.id ? " [ACTIVE]" : "";
+          const type = d.isSimulator ? "simulator" : "physical";
+          result += `  • ${d.id} - ${d.name} (${type}, ${d.state})${active}\n`;
+        }
+      }
+
+      return { text: result.trim() };
     }
 
     case "set_device": {
-      adb.setDevice(args.deviceId as string);
-      return { text: `Device set to: ${args.deviceId}` };
+      const device = deviceManager.setDevice(args.deviceId as string, platform);
+      return { text: `Device set to: ${device.name} (${device.platform}, ${device.id})` };
     }
 
     case "screenshot": {
-      const base64 = adb.screenshot();
+      const base64 = deviceManager.screenshot(platform);
       return {
         image: {
           data: base64,
@@ -324,7 +393,13 @@ async function handleTool(name: string, args: Record<string, unknown>): Promise<
     }
 
     case "get_ui": {
-      const xml = adb.getUiHierarchy();
+      const currentPlatform = platform ?? deviceManager.getCurrentPlatform();
+
+      if (currentPlatform === "ios") {
+        return { text: "iOS UI hierarchy is limited. Use screenshot + tap by coordinates, or integrate WebDriverAgent for full UI inspection." };
+      }
+
+      const xml = deviceManager.getUiHierarchy(platform);
       cachedElements = parseUiHierarchy(xml);
       const tree = formatUiTree(cachedElements, {
         showAll: args.showAll as boolean,
@@ -335,13 +410,13 @@ async function handleTool(name: string, args: Record<string, unknown>): Promise<
     case "tap": {
       let x: number | undefined = args.x as number;
       let y: number | undefined = args.y as number;
+      const currentPlatform = platform ?? deviceManager.getCurrentPlatform();
 
-      // Find by index from cached elements
-      if (args.index !== undefined) {
+      // Find by index from cached elements (Android only)
+      if (args.index !== undefined && currentPlatform === "android") {
         const idx = args.index as number;
         if (cachedElements.length === 0) {
-          // Refresh cache
-          const xml = adb.getUiHierarchy();
+          const xml = deviceManager.getUiHierarchy("android");
           cachedElements = parseUiHierarchy(xml);
         }
         const el = cachedElements.find(e => e.index === idx);
@@ -352,9 +427,9 @@ async function handleTool(name: string, args: Record<string, unknown>): Promise<
         y = el.centerY;
       }
 
-      // Find by text or resourceId
-      if (args.text || args.resourceId) {
-        const xml = adb.getUiHierarchy();
+      // Find by text or resourceId (Android only)
+      if ((args.text || args.resourceId) && currentPlatform === "android") {
+        const xml = deviceManager.getUiHierarchy("android");
         cachedElements = parseUiHierarchy(xml);
 
         let found: UiElement[] = [];
@@ -365,12 +440,9 @@ async function handleTool(name: string, args: Record<string, unknown>): Promise<
         }
 
         if (found.length === 0) {
-          return {
-            text: `Element not found: ${args.text || args.resourceId}`,
-          };
+          return { text: `Element not found: ${args.text || args.resourceId}` };
         }
 
-        // Prefer clickable elements
         const clickable = found.filter(el => el.clickable);
         const target = clickable[0] ?? found[0];
         x = target.centerX;
@@ -381,7 +453,7 @@ async function handleTool(name: string, args: Record<string, unknown>): Promise<
         return { text: "Please provide x,y coordinates, text, resourceId, or index" };
       }
 
-      adb.tap(x, y);
+      deviceManager.tap(x, y, platform);
       return { text: `Tapped at (${x}, ${y})` };
     }
 
@@ -389,9 +461,10 @@ async function handleTool(name: string, args: Record<string, unknown>): Promise<
       let x: number | undefined = args.x as number;
       let y: number | undefined = args.y as number;
       const duration = (args.duration as number) ?? 1000;
+      const currentPlatform = platform ?? deviceManager.getCurrentPlatform();
 
-      if (args.text) {
-        const xml = adb.getUiHierarchy();
+      if (args.text && currentPlatform === "android") {
+        const xml = deviceManager.getUiHierarchy("android");
         cachedElements = parseUiHierarchy(xml);
         const found = findByText(cachedElements, args.text as string);
         if (found.length === 0) {
@@ -405,46 +478,51 @@ async function handleTool(name: string, args: Record<string, unknown>): Promise<
         return { text: "Please provide x,y coordinates or text" };
       }
 
-      adb.longPress(x, y, duration);
+      deviceManager.longPress(x, y, duration, platform);
       return { text: `Long pressed at (${x}, ${y}) for ${duration}ms` };
     }
 
     case "swipe": {
       if (args.direction) {
-        adb.swipeDirection(args.direction as "up" | "down" | "left" | "right");
+        deviceManager.swipeDirection(args.direction as "up" | "down" | "left" | "right", platform);
         return { text: `Swiped ${args.direction}` };
       }
 
       if (args.x1 !== undefined && args.y1 !== undefined &&
           args.x2 !== undefined && args.y2 !== undefined) {
         const duration = (args.duration as number) ?? 300;
-        adb.swipe(
+        deviceManager.swipe(
           args.x1 as number,
           args.y1 as number,
           args.x2 as number,
           args.y2 as number,
-          duration
+          duration,
+          platform
         );
-        return {
-          text: `Swiped from (${args.x1}, ${args.y1}) to (${args.x2}, ${args.y2})`,
-        };
+        return { text: `Swiped from (${args.x1}, ${args.y1}) to (${args.x2}, ${args.y2})` };
       }
 
       return { text: "Please provide direction or x1,y1,x2,y2 coordinates" };
     }
 
     case "input_text": {
-      adb.inputText(args.text as string);
+      deviceManager.inputText(args.text as string, platform);
       return { text: `Entered text: "${args.text}"` };
     }
 
     case "press_key": {
-      adb.pressKey(args.key as string);
+      deviceManager.pressKey(args.key as string, platform);
       return { text: `Pressed key: ${args.key}` };
     }
 
     case "find_element": {
-      const xml = adb.getUiHierarchy();
+      const currentPlatform = platform ?? deviceManager.getCurrentPlatform();
+
+      if (currentPlatform === "ios") {
+        return { text: "find_element is only available for Android. Use screenshot + tap by coordinates for iOS." };
+      }
+
+      const xml = deviceManager.getUiHierarchy("android");
       cachedElements = parseUiHierarchy(xml);
 
       const found = findElements(cachedElements, {
@@ -459,33 +537,37 @@ async function handleTool(name: string, args: Record<string, unknown>): Promise<
       }
 
       const list = found.slice(0, 20).map(formatElement).join("\n");
-      return {
-        text: `Found ${found.length} element(s):\n${list}${found.length > 20 ? "\n..." : ""}`,
-      };
+      return { text: `Found ${found.length} element(s):\n${list}${found.length > 20 ? "\n..." : ""}` };
     }
 
     case "launch_app": {
-      const result = adb.launchApp(args.package as string);
+      const result = deviceManager.launchApp(args.package as string, platform);
       return { text: result };
     }
 
     case "stop_app": {
-      adb.stopApp(args.package as string);
+      deviceManager.stopApp(args.package as string, platform);
       return { text: `Stopped: ${args.package}` };
     }
 
-    case "install_apk": {
-      const result = adb.installApk(args.path as string);
+    case "install_app": {
+      const result = deviceManager.installApp(args.path as string, platform);
       return { text: result };
     }
 
     case "get_current_activity": {
-      const activity = adb.getCurrentActivity();
+      const currentPlatform = platform ?? deviceManager.getCurrentPlatform();
+
+      if (currentPlatform === "ios") {
+        return { text: "get_current_activity is only available for Android." };
+      }
+
+      const activity = deviceManager.getAndroidClient().getCurrentActivity();
       return { text: `Current activity: ${activity}` };
     }
 
     case "shell": {
-      const output = adb.shell(args.command as string);
+      const output = deviceManager.shell(args.command as string, platform);
       return { text: output || "(no output)" };
     }
 
@@ -493,6 +575,17 @@ async function handleTool(name: string, args: Record<string, unknown>): Promise<
       const ms = (args.ms as number) ?? 1000;
       await new Promise(resolve => setTimeout(resolve, ms));
       return { text: `Waited ${ms}ms` };
+    }
+
+    case "open_url": {
+      const currentPlatform = platform ?? deviceManager.getCurrentPlatform();
+
+      if (currentPlatform === "android") {
+        deviceManager.getAndroidClient().shell(`am start -a android.intent.action.VIEW -d "${args.url}"`);
+      } else {
+        deviceManager.getIosClient().openUrl(args.url as string);
+      }
+      return { text: `Opened URL: ${args.url}` };
     }
 
     default:
@@ -503,8 +596,8 @@ async function handleTool(name: string, args: Record<string, unknown>): Promise<
 // Create server
 const server = new Server(
   {
-    name: "claude-in-android",
-    version: "1.0.0",
+    name: "claude-mobile",
+    version: "2.0.0",
   },
   {
     capabilities: {
@@ -569,7 +662,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("Claude in Android MCP server running");
+  console.error("Claude Mobile MCP server running (Android + iOS)");
 }
 
 main().catch((error) => {

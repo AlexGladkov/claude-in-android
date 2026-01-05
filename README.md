@@ -1,19 +1,31 @@
-# Claude in Android
+# Claude Mobile
 
-MCP server for Android device automation via ADB. Like [Claude in Chrome](https://github.com/anthropics/claude-chrome-extension) but for Android devices.
+MCP server for mobile device automation — Android (via ADB) and iOS Simulator (via simctl).
 
-Control your Android phone or emulator with natural language through Claude.
+Control your Android phone, emulator, or iOS Simulator with natural language through Claude.
 
 ## Features
 
-- **Screenshot capture** - See what's on the device screen
-- **UI hierarchy parsing** - Get accessibility tree with interactive elements
-- **Touch interactions** - Tap, long press, swipe by coordinates or element text
-- **Text input** - Type into focused fields
-- **App control** - Launch, stop, and install apps
-- **Shell access** - Run arbitrary ADB commands
+- **Unified API** — Same commands work for both Android and iOS
+- **Screenshot capture** — See what's on the device screen
+- **UI interactions** — Tap, long press, swipe by coordinates or element text
+- **Text input** — Type into focused fields
+- **App control** — Launch, stop, and install apps
+- **Platform selection** — Explicitly target Android or iOS, or auto-detect
 
 ## Installation
+
+### Claude Code CLI (recommended)
+
+```bash
+claude mcp add --transport stdio mobile -- npx -y claude-in-android
+```
+
+To add globally (available in all projects):
+
+```bash
+claude mcp add --scope user --transport stdio mobile -- npx -y claude-in-android
+```
 
 ### From npm
 
@@ -30,20 +42,6 @@ npm install
 npm run build
 ```
 
-## Configuration
-
-### Claude Code CLI (recommended)
-
-```bash
-claude mcp add --transport stdio android -- npx -y claude-in-android
-```
-
-To add globally (available in all projects):
-
-```bash
-claude mcp add --scope user --transport stdio android -- npx -y claude-in-android
-```
-
 ### Manual configuration
 
 Add to your Claude Code settings (`~/.claude.json` or project settings):
@@ -51,7 +49,7 @@ Add to your Claude Code settings (`~/.claude.json` or project settings):
 ```json
 {
   "mcpServers": {
-    "android": {
+    "mobile": {
       "command": "npx",
       "args": ["-y", "claude-in-android"]
     }
@@ -62,56 +60,90 @@ Add to your Claude Code settings (`~/.claude.json` or project settings):
 ### Windows
 
 ```bash
-claude mcp add --transport stdio android -- cmd /c npx -y claude-in-android
+claude mcp add --transport stdio mobile -- cmd /c npx -y claude-in-android
 ```
 
 ## Requirements
 
-- Node.js 18+
+### Android
 - ADB installed and in PATH
 - Connected Android device (USB debugging enabled) or emulator
 
+### iOS
+- macOS with Xcode installed
+- iOS Simulator (no physical device support yet)
+
 ## Available Tools
 
-| Tool | Description |
-|------|-------------|
-| `list_devices` | List connected devices and emulators |
-| `set_device` | Select active device for commands |
-| `screenshot` | Take screenshot (returns image) |
-| `get_ui` | Get UI hierarchy (accessibility tree) |
-| `tap` | Tap by coordinates, text, resourceId, or index |
-| `long_press` | Long press gesture |
-| `swipe` | Swipe in direction or custom coordinates |
-| `input_text` | Type text into focused field |
-| `press_key` | Press BACK, HOME, ENTER, etc. |
-| `find_element` | Find elements by text/id/class |
-| `launch_app` | Launch app by package name |
-| `stop_app` | Force stop app |
-| `install_apk` | Install APK file |
-| `get_current_activity` | Get foreground activity |
-| `shell` | Run ADB shell command |
-| `wait` | Wait for specified duration |
+| Tool | Android | iOS | Description |
+|------|---------|-----|-------------|
+| `list_devices` | ✅ | ✅ | List all connected devices |
+| `set_device` | ✅ | ✅ | Select active device |
+| `screenshot` | ✅ | ✅ | Take screenshot |
+| `tap` | ✅ | ✅ | Tap at coordinates or by text |
+| `long_press` | ✅ | ✅ | Long press gesture |
+| `swipe` | ✅ | ✅ | Swipe in direction or coordinates |
+| `input_text` | ✅ | ✅ | Type text |
+| `press_key` | ✅ | ✅ | Press hardware buttons |
+| `launch_app` | ✅ | ✅ | Launch app |
+| `stop_app` | ✅ | ✅ | Stop app |
+| `install_app` | ✅ | ✅ | Install APK/.app |
+| `get_ui` | ✅ | ⚠️ | Get UI hierarchy (limited on iOS) |
+| `find_element` | ✅ | ❌ | Find elements by text/id |
+| `get_current_activity` | ✅ | ❌ | Get foreground activity |
+| `open_url` | ✅ | ✅ | Open URL in browser |
+| `shell` | ✅ | ✅ | Run shell command |
+| `wait` | ✅ | ✅ | Wait for duration |
 
 ## Usage Examples
 
 Just talk to Claude naturally:
 
 ```
-"Take a screenshot of my phone"
+"Show me all connected devices"
+"Take a screenshot of the Android emulator"
+"Take a screenshot on iOS"
 "Tap on Settings"
 "Swipe down to scroll"
 "Type 'hello world' in the search field"
-"Press the back button"
-"Open Chrome"
-"What app is currently open?"
+"Press the back button on Android"
+"Open Safari on iOS"
+"Switch to iOS simulator"
+"Run the app on both platforms"
+```
+
+### Platform Selection
+
+You can explicitly specify the platform:
+
+```
+"Screenshot on android"     → Uses Android device
+"Screenshot on ios"         → Uses iOS simulator
+"Screenshot"                → Uses last active device
+```
+
+Or set the active device:
+
+```
+"Use the iPhone 15 simulator"
+"Switch to the Android emulator"
 ```
 
 ## How It Works
 
+```
+┌─────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│   Claude    │────▶│  Claude Mobile   │────▶│  Android (ADB)  │
+│             │     │   MCP Server     │     └─────────────────┘
+│             │     │                  │     ┌─────────────────┐
+│             │     │                  │────▶│  iOS (simctl)   │
+└─────────────┘     └──────────────────┘     └─────────────────┘
+```
+
 1. Claude sends commands through MCP protocol
-2. This server translates them to ADB commands
-3. ADB executes on your connected device
-4. Results (screenshots, UI data) are returned to Claude
+2. Server routes to appropriate platform (ADB or simctl)
+3. Commands execute on your device
+4. Results (screenshots, UI data) return to Claude
 
 ## License
 

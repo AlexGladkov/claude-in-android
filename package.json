@@ -1,7 +1,7 @@
 {
   "name": "claude-in-android",
-  "version": "1.0.1",
-  "description": "MCP server for Android device automation via ADB",
+  "version": "2.0.0",
+  "description": "MCP server for mobile device automation - Android (ADB) and iOS Simulator (simctl)",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
@@ -17,7 +17,10 @@
   "keywords": [
     "mcp",
     "android",
+    "ios",
     "adb",
+    "simctl",
+    "mobile",
     "automation",
     "claude",
     "anthropic",
