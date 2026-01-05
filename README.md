@@ -19,7 +19,7 @@ Control your Android phone, emulator, or iOS Simulator with natural language thr
 ### Claude Code CLI (recommended)
 
 ```bash
-claude mcp add --transport stdio mobile -- npx -y claude-in-android
+claude mcp add --transport stdio mobile -- npx -y claude-in-mobile
 ```
 
 To add globally (available in all projects):
@@ -31,7 +31,7 @@ claude mcp add --scope user --transport stdio mobile -- npx -y claude-in-android
 ### From npm
 
 ```bash
-npx claude-in-android
+npx claude-in-mobile
 ```
 
 ### From source
@@ -52,7 +52,7 @@ Add to your Claude Code settings (`~/.claude.json` or project settings):
   "mcpServers": {
     "mobile": {
       "command": "npx",
-      "args": ["-y", "claude-in-android"]
+      "args": ["-y", "claude-in-mobile"]
     }
   }
 }

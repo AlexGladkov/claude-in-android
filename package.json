@@ -1,11 +1,11 @@
 {
-  "name": "claude-in-android",
+  "name": "claude-in-mobile",
   "version": "2.1.1",
   "description": "MCP server for mobile device automation - Android (ADB) and iOS Simulator (simctl)",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "claude-in-android": "dist/index.js"
+    "claude-in-mobile": "dist/index.js"
   },
   "scripts": {
     "build": "tsc",
