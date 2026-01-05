@@ -1,6 +1,6 @@
 # Claude Mobile
 
-MCP server for mobile device automation — Android (via ADB) and iOS Simulator (via simctl).
+MCP server for mobile device automation — Android (via ADB) and iOS Simulator (via simctl). Like [Claude in Chrome](https://www.anthropic.com/news/claude-for-chrome) but for mobile devices.
 
 Control your Android phone, emulator, or iOS Simulator with natural language through Claude.
 
