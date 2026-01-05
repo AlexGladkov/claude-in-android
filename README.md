@@ -36,8 +36,8 @@ npx claude-in-android
 ### From source
 
 ```bash
-git clone https://github.com/AlexGladkov/claude-in-android.git
-cd claude-in-android
+git clone https://github.com/AlexGladkov/claude-in-mobile.git
+cd claude-in-mobile
 npm install
 npm run build
 ```

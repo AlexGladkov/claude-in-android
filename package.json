@@ -30,12 +30,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/AlexGladkov/claude-in-android.git"
+    "url": "git+https://github.com/AlexGladkov/claude-in-mobile.git"
   },
   "bugs": {
-    "url": "https://github.com/AlexGladkov/claude-in-android/issues"
+    "url": "https://github.com/AlexGladkov/claude-in-mobile/issues"
   },
-  "homepage": "https://github.com/AlexGladkov/claude-in-android#readme",
+  "homepage": "https://github.com/AlexGladkov/claude-in-mobile#readme",
   "engines": {
     "node": ">=18.0.0"
   },
