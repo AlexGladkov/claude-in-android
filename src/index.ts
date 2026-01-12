@@ -16,6 +16,9 @@ import {
   findElements,
   formatUiTree,
   formatElement,
+  analyzeScreen,
+  findBestMatch,
+  formatScreenAnalysis,
   UiElement,
 } from "./adb/ui-parser.js";
 
@@ -527,6 +530,37 @@ const tools: Tool[] = [
       properties: {},
     },
   },
+  // ============ Smart Android UI Tools ============
+  {
+    name: "analyze_screen",
+    description: "Get structured analysis of the current screen without taking a screenshot. Returns buttons, input fields, text content, and scrollable areas. Much cheaper than screenshot for understanding screen layout. (Android only)",
+    inputSchema: {
+      type: "object",
+      properties: {
+        platform: platformParam,
+      },
+    },
+  },
+  {
+    name: "find_and_tap",
+    description: "Smart tap by element description. Uses fuzzy matching to find the best element by text, content description, or resource ID, then taps it. More reliable than exact text matching. (Android only)",
+    inputSchema: {
+      type: "object",
+      properties: {
+        description: {
+          type: "string",
+          description: "Natural language description of the element to tap, e.g., 'submit button', 'settings', 'back'",
+        },
+        minConfidence: {
+          type: "number",
+          description: "Minimum confidence score (0-100) to accept a match (default: 30)",
+          default: 30,
+        },
+        platform: platformParam,
+      },
+      required: ["description"],
+    },
+  },
 ];
 
 // Cache for UI elements (to support tap by index)
@@ -919,6 +953,69 @@ async function handleTool(name: string, args: Record<string, unknown>): Promise<
       return { text: result.trim() };
     }
 
+    // ============ Smart Android UI Tools ============
+
+    case "analyze_screen": {
+      const currentPlatform = platform ?? deviceManager.getCurrentPlatform();
+
+      if (currentPlatform !== "android") {
+        return { text: "analyze_screen is only available for Android. Use screenshot for iOS/Desktop." };
+      }
+
+      const xml = await deviceManager.getUiHierarchy("android");
+      cachedElements = parseUiHierarchy(xml);
+
+      // Get current activity for context
+      let activity: string | undefined;
+      try {
+        activity = deviceManager.getAndroidClient().getCurrentActivity();
+      } catch {
+        // Ignore - activity is optional
+      }
+
+      const analysis = analyzeScreen(cachedElements, activity);
+      return { text: formatScreenAnalysis(analysis) };
+    }
+
+    case "find_and_tap": {
+      const currentPlatform = platform ?? deviceManager.getCurrentPlatform();
+
+      if (currentPlatform !== "android") {
+        return { text: "find_and_tap is only available for Android. Use tap with coordinates for iOS/Desktop." };
+      }
+
+      const description = args.description as string;
+      const minConfidence = (args.minConfidence as number) ?? 30;
+
+      // Get fresh UI hierarchy
+      const xml = await deviceManager.getUiHierarchy("android");
+      cachedElements = parseUiHierarchy(xml);
+
+      // Find best matching element
+      const match = findBestMatch(cachedElements, description);
+
+      if (!match) {
+        return { text: `No element found matching "${description}". Try using get_ui or analyze_screen to see available elements.` };
+      }
+
+      if (match.confidence < minConfidence) {
+        return {
+          text: `Best match has low confidence (${match.confidence}%): ${match.reason}\n` +
+                `Element: ${formatElement(match.element)}\n` +
+                `Set minConfidence lower or use tap with coordinates.`
+        };
+      }
+
+      // Tap the element
+      await deviceManager.tap(match.element.centerX, match.element.centerY, "android");
+
+      return {
+        text: `Tapped "${description}" (${match.confidence}% confidence)\n` +
+              `Match: ${match.reason}\n` +
+              `Coordinates: (${match.element.centerX}, ${match.element.centerY})`
+      };
+    }
+
     default:
       throw new Error(`Unknown tool: ${name}`);
   }
@@ -928,7 +1025,7 @@ async function handleTool(name: string, args: Record<string, unknown>): Promise<
 const server = new Server(
   {
     name: "claude-mobile",
-    version: "2.2.0",
+    version: "2.3.0",
   },
   {
     capabilities: {

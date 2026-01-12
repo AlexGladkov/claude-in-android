@@ -69,4 +69,67 @@ export declare function formatUiTree(elements: UiElement[], options?: {
     showAll?: boolean;
     maxElements?: number;
 }): string;
+/**
+ * Screen analysis result
+ */
+export interface ScreenAnalysis {
+    /** Current activity/screen name */
+    activity?: string;
+    /** Buttons and clickable elements */
+    buttons: Array<{
+        index: number;
+        label: string;
+        coordinates: {
+            x: number;
+            y: number;
+        };
+    }>;
+    /** Text input fields */
+    inputs: Array<{
+        index: number;
+        hint: string;
+        value: string;
+        coordinates: {
+            x: number;
+            y: number;
+        };
+    }>;
+    /** Static text on screen */
+    texts: Array<{
+        content: string;
+        coordinates: {
+            x: number;
+            y: number;
+        };
+    }>;
+    /** Scrollable containers */
+    scrollable: Array<{
+        index: number;
+        direction: "vertical" | "horizontal" | "both";
+        coordinates: {
+            x: number;
+            y: number;
+        };
+    }>;
+    /** Summary for quick understanding */
+    summary: string;
+}
+/**
+ * Analyze screen and return structured information
+ * More useful than raw UI tree for Claude to understand
+ */
+export declare function analyzeScreen(elements: UiElement[], activity?: string): ScreenAnalysis;
+/**
+ * Find best element by description (smart fuzzy search)
+ * Returns the best match or null
+ */
+export declare function findBestMatch(elements: UiElement[], description: string): {
+    element: UiElement;
+    confidence: number;
+    reason: string;
+} | null;
+/**
+ * Format screen analysis as text
+ */
+export declare function formatScreenAnalysis(analysis: ScreenAnalysis): string;
 //# sourceMappingURL=ui-parser.d.ts.map
