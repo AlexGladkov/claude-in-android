@@ -29,7 +29,7 @@ const deviceManager = new DeviceManager();
 // Platform parameter schema (reused across tools)
 const platformParam = {
   type: "string",
-  enum: ["android", "ios", "desktop"],
+  enum: ["android", "ios", "desktop", "aurora"],
   description: "Target platform. If not specified, uses the active target.",
 };
 

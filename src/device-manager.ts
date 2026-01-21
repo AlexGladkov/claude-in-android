@@ -154,18 +154,6 @@ export class DeviceManager {
       });
     }
 
-    // Add desktop as virtual device if running
-    if (this.desktopClient.isRunning()) {
-      const state = this.desktopClient.getState();
-      devices.push({
-        id: "desktop",
-        name: "Desktop App",
-        platform: "desktop",
-        state: state.status,
-        isSimulator: false
-      });
-    }
-
     // Get Aurora devices
     try {
       const auroraDevices = await this.aurora.listDevices();
@@ -307,9 +295,18 @@ export class DeviceManager {
    */
   screenshotRaw(platform?: Platform): string {
     const client = this.getClient(platform);
+
+    // Desktop and Aurora don't support screenshotRaw
     if (client instanceof DesktopClient) {
       throw new Error("Use screenshot() for desktop platform");
     }
+
+    // Aurora client doesn't have screenshotRaw
+    if ("screenshot" in client && typeof client.screenshot === "function" && !("screenshotRaw" in client)) {
+      throw new Error("Use screenshot() for aurora platform");
+    }
+
+    // Android and iOS clients
     return (client as AdbClient | IosClient).screenshot();
   }
 
