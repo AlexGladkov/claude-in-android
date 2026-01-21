@@ -20,8 +20,9 @@ export interface Device {
   id: string;
   name: string;
   platform: "aurora";
-  state: "connected" | "disconnected";
-  host: string;
+  state: string;
+  isSimulator: boolean;
+  host?: string;
 }
 
 export class AuroraClient {
