@@ -149,6 +149,44 @@ export class AuroraClient {
       await fs.unlink(tmpFile).catch(() => {});
     }
   }
+
+  /**
+   * Launch an application on the Aurora device
+   * @param package - Application name (D-Bus format: ru.domain.AppName)
+   * @returns Output message from audb
+   */
+  async launchApp(packageName: string): Promise<string> {
+    const output = await this.runCommand(`audb launch ${packageName}`);
+    return output || `Launched ${packageName}`;
+  }
+
+  /**
+   * Stop a running application
+   * @param package - Application name (D-Bus format: ru.domain.AppName)
+   */
+  async stopApp(packageName: string): Promise<void> {
+    await this.runCommand(`audb stop ${packageName}`);
+  }
+
+  /**
+   * Install an RPM package on the Aurora device
+   * @param path - Local path to the RPM file
+   * @returns Installation result message
+   */
+  async installApp(path: string): Promise<string> {
+    const output = await this.runCommand(`audb package install ${path}`);
+    return output || `Installed ${path}`;
+  }
+
+  /**
+   * Uninstall a package from the Aurora device
+   * @param package - Package name (e.g., ru.domain.AppName)
+   * @returns Uninstallation result message
+   */
+  async uninstallApp(packageName: string): Promise<string> {
+    const output = await this.runCommand(`audb package uninstall ${packageName}`);
+    return output || `Uninstalled ${packageName}`;
+  }
 }
 
 export const auroraClient = new AuroraClient();
