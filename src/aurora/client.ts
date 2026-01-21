@@ -246,6 +246,29 @@ export class AuroraClient {
   async getSystemInfo(): Promise<string> {
     return await this.runCommand("audb info");
   }
+
+  /**
+   * Upload a file to the Aurora device
+   * @param localPath - Path to the local file
+   * @param remotePath - Destination path on the device
+   * @returns Upload result message
+   */
+  async pushFile(localPath: string, remotePath: string): Promise<string> {
+    const output = await this.runCommand(`audb push ${localPath} ${remotePath}`);
+    return output || `Uploaded ${localPath} → ${remotePath}`;
+  }
+
+  /**
+   * Download a file from the Aurora device
+   * @param remotePath - Path to the remote file
+   * @param localPath - Optional local destination path (defaults to remote filename)
+   * @returns File contents as Buffer
+   */
+  async pullFile(remotePath: string, localPath?: string): Promise<Buffer> {
+    const local = localPath || remotePath.split("/").pop() || "pulled_file";
+    await this.runCommand(`audb pull ${remotePath} --output ${local}`);
+    return await fs.readFile(local);
+  }
 }
 
 export const auroraClient = new AuroraClient();
