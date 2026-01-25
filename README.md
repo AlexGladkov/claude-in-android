@@ -108,7 +108,7 @@ claude mcp add --transport stdio mobile -- cmd /c npx -y claude-in-android
 | `get_ui` | ✅ | ⚠️ | ✅ | ❌ | Get UI hierarchy |
 | `find_element` | ✅ | ❌ | ✅ | ❌ | Find elements by text/id |
 | `get_current_activity` | ✅ | ❌ | ❌ | ❌ | Get foreground activity |
-| `open_url` | ✅ | ✅ | ❌ | ❌ | Open URL in browser |
+| `open_url` | ✅ | ✅ | ❌ | ❌ | Open URL in browser (not yet implemented on Aurora) |
 | `shell` | ✅ | ✅ | ❌ | ✅ | Run shell command |
 | `wait` | ✅ | ✅ | ✅ | ✅ | Wait for duration |
 | `get_logs` | ✅ | ✅ | ❌ | ✅ | Get device logs (logcat/system log) |
