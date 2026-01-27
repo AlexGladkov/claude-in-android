@@ -1158,7 +1158,7 @@ fn run(cli: Cli) -> Result<()> {
 
         Commands::ScreenSize {
             platform,
-            simulator: _,
+            simulator,
             device,
         } => {
             if platform == "android" {
@@ -1166,8 +1166,10 @@ fn run(cli: Cli) -> Result<()> {
                 println!("Screen size: {}x{}", w, h);
                 Ok(())
             } else {
-                println!("Note: iOS screen size detection via simctl is limited");
-                println!("Use Xcode or Accessibility Inspector for accurate dimensions");
+                // Get screen size from screenshot dimensions
+                let data = ios::screenshot(simulator.as_deref())?;
+                let img = image::load_from_memory(&data)?;
+                println!("Screen size: {}x{}", img.width(), img.height());
                 Ok(())
             }
         }

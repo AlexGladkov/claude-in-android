@@ -101,9 +101,9 @@ pub fn open_url(url: &str, simulator: Option<&str>) -> Result<()> {
 pub fn shell(command: &str, simulator: Option<&str>) -> Result<String> {
     let udid = get_simulator_udid(simulator)?;
 
-    // Use spawn with sh -c for proper command execution
+    // Use spawn with full path to sh (not in PATH on iOS simulator)
     let output = Command::new("xcrun")
-        .args(["simctl", "spawn", &udid, "sh", "-c", command])
+        .args(["simctl", "spawn", &udid, "/bin/sh", "-c", command])
         .output()
         .context("Failed to execute shell command")?;
 
@@ -227,16 +227,51 @@ pub fn press_key(key: &str, simulator: Option<&str>) -> Result<()> {
 
     match key.to_lowercase().as_str() {
         "home" => {
-            let output = simctl_exec(&["io", &udid, "home"]);
-            if output.is_err() || !output.unwrap().status.success() {
-                simctl_exec(&["spawn", &udid, "notifyutil", "-p", "com.apple.springboard.home"])?;
+            // Use AppleScript with key code 4 (H) + Cmd+Shift — Simulator shortcut for Home
+            let script = r#"tell application "Simulator" to activate
+            delay 0.3
+            tell application "System Events" to key code 4 using {command down, shift down}"#;
+            let output = Command::new("osascript")
+                .args(["-e", script])
+                .output()
+                .context("Failed to press Home via AppleScript")?;
+            if !output.status.success() {
+                let _ = simctl_exec(&["spawn", &udid, "notifyutil", "-p", "com.apple.springboard.home"]);
             }
         }
+        "lock" => {
+            // Cmd+L
+            let script = r#"tell application "Simulator" to activate
+            delay 0.1
+            tell application "System Events"
+                keystroke "l" using {command down}
+            end tell"#;
+            let _ = Command::new("osascript").args(["-e", script]).output();
+        }
         "shake" => {
-            simctl_exec(&["io", &udid, "shake"])?;
+            // Cmd+Ctrl+Z
+            let script = r#"tell application "Simulator" to activate
+            delay 0.1
+            tell application "System Events"
+                keystroke "z" using {command down, control down}
+            end tell"#;
+            let _ = Command::new("osascript").args(["-e", script]).output();
         }
         _ => {
-            simctl_exec(&["io", &udid, "key", key])?;
+            // Try simctl io key for other keys
+            let output = simctl_exec(&["io", &udid, "key", key]);
+            if output.is_err() || !output.as_ref().unwrap().status.success() {
+                // Fallback: try AppleScript keystroke
+                let script = format!(
+                    r#"tell application "Simulator" to activate
+                    delay 0.1
+                    tell application "System Events"
+                        keystroke "{}"
+                    end tell"#,
+                    key
+                );
+                let _ = Command::new("osascript").args(["-e", &script]).output();
+            }
         }
     }
 
@@ -331,14 +366,48 @@ pub fn list_apps(filter: Option<&str>, simulator: Option<&str>) -> Result<()> {
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let bundle_re = regex::Regex::new(r#"CFBundleIdentifier[^<]*<string>([^<]+)</string>"#).unwrap();
 
-    let mut apps: Vec<String> = bundle_re.captures_iter(&stdout)
-        .map(|cap| cap[1].to_string())
-        .filter(|bundle_id| {
-            filter.map_or(true, |f| bundle_id.to_lowercase().contains(&f.to_lowercase()))
-        })
-        .collect();
+    // listapps returns plist-like format: "com.apple.BundleID" = { ... CFBundleDisplayName = Name; ... }
+    // Parse top-level keys (bundle IDs) and display names
+    let bundle_re = regex::Regex::new(r#"^\s+"([^"]+)"\s+=\s+\{"#).unwrap();
+    let display_re = regex::Regex::new(r#"CFBundleDisplayName\s*=\s*"?([^";]+)"?\s*;"#).unwrap();
+
+    let mut apps: Vec<String> = Vec::new();
+    let mut current_bundle: Option<String> = None;
+    let mut current_display: Option<String> = None;
+
+    for line in stdout.lines() {
+        if let Some(cap) = bundle_re.captures(line) {
+            // Save previous entry
+            if let Some(bundle) = current_bundle.take() {
+                let display = current_display.take().unwrap_or_default();
+                let entry = if display.is_empty() {
+                    bundle
+                } else {
+                    format!("{} ({})", bundle, display)
+                };
+                apps.push(entry);
+            }
+            current_bundle = Some(cap[1].to_string());
+            current_display = None;
+        } else if current_bundle.is_some() {
+            if let Some(cap) = display_re.captures(line) {
+                current_display = Some(cap[1].trim().to_string());
+            }
+        }
+    }
+    // Last entry
+    if let Some(bundle) = current_bundle {
+        let display = current_display.unwrap_or_default();
+        let entry = if display.is_empty() { bundle } else { format!("{} ({})", bundle, display) };
+        apps.push(entry);
+    }
+
+    // Apply filter
+    if let Some(f) = filter {
+        let f_lower = f.to_lowercase();
+        apps.retain(|a| a.to_lowercase().contains(&f_lower));
+    }
 
     apps.sort();
     apps.dedup();
