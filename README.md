@@ -1,18 +1,18 @@
 # Claude Mobile
 
-MCP server for mobile and desktop automation — Android (via ADB), iOS Simulator (via simctl), and Desktop (Compose Multiplatform). Like [Claude in Chrome](https://www.anthropic.com/news/claude-for-chrome) but for mobile devices and desktop apps.
+MCP server for mobile and desktop automation — Android (via ADB), iOS Simulator (via simctl), Desktop (Compose Multiplatform), and Aurora OS (via audb). Like [Claude in Chrome](https://www.anthropic.com/news/claude-for-chrome) but for mobile devices and desktop apps.
 
-Control your Android phone, emulator, iOS Simulator, or Desktop applications with natural language through Claude.
+Control your Android phone, emulator, iOS Simulator, Desktop applications, or Aurora OS device with natural language through Claude.
 
 ## Features
 
-- **Unified API** — Same commands work for Android, iOS, and Desktop
+- **Unified API** — Same commands work for Android, iOS, Desktop, and Aurora OS
 - **Smart screenshots** — Auto-compressed for optimal LLM processing (no more oversized images!)
 - **Device logs** — Read logcat/system logs with filters for debugging
 - **UI interactions** — Tap, long press, swipe by coordinates or element text
 - **Text input** — Type into focused fields
 - **App control** — Launch, stop, and install apps
-- **Platform selection** — Explicitly target Android, iOS, or Desktop
+- **Platform selection** — Explicitly target Android, iOS, Desktop, or Aurora OS
 - **Desktop support** — Test Compose Multiplatform desktop apps with window management, clipboard, and performance metrics
 
 ## Installation
@@ -82,32 +82,40 @@ claude mcp add --transport stdio mobile -- cmd /c npx -y claude-in-android
 - JDK 17+ for building the Desktop companion
 - Compose Multiplatform desktop application to test
 
+### Aurora OS
+- audb CLI installed and in PATH (`cargo install audb-client`)
+- Connected Aurora OS device with SSH enabled
+- Python on device required for tap/swipe: `devel-su pkcon install python`
+
 ## Available Tools
 
 ### Core Tools (All Platforms)
 
-| Tool | Android | iOS | Desktop | Description |
-|------|---------|-----|---------|-------------|
-| `list_devices` | ✅ | ✅ | ✅ | List all connected devices |
-| `set_device` | ✅ | ✅ | ✅ | Select active device |
-| `screenshot` | ✅ | ✅ | ✅ | Take screenshot |
-| `tap` | ✅ | ✅ | ✅ | Tap at coordinates or by text |
-| `long_press` | ✅ | ✅ | ✅ | Long press gesture |
-| `swipe` | ✅ | ✅ | ✅ | Swipe in direction or coordinates |
-| `input_text` | ✅ | ✅ | ✅ | Type text |
-| `press_key` | ✅ | ✅ | ✅ | Press hardware buttons |
-| `launch_app` | ✅ | ✅ | ❌ | Launch app (use `launch_desktop_app` for Desktop) |
-| `stop_app` | ✅ | ✅ | ❌ | Stop app (use `stop_desktop_app` for Desktop) |
-| `install_app` | ✅ | ✅ | ❌ | Install APK/.app |
-| `get_ui` | ✅ | ⚠️ | ✅ | Get UI hierarchy (limited on iOS) |
-| `find_element` | ✅ | ❌ | ✅ | Find elements by text/id |
-| `get_current_activity` | ✅ | ❌ | ❌ | Get foreground activity |
-| `open_url` | ✅ | ✅ | ❌ | Open URL in browser |
-| `shell` | ✅ | ✅ | ❌ | Run shell command |
-| `wait` | ✅ | ✅ | ✅ | Wait for duration |
-| `get_logs` | ✅ | ✅ | ❌ | Get device logs (logcat/system log) |
-| `clear_logs` | ✅ | ⚠️ | ❌ | Clear log buffer |
-| `get_system_info` | ✅ | ❌ | ❌ | Battery, memory info |
+| Tool | Android | iOS | Desktop | Aurora | Description |
+|------|---------|-----|---------|--------|-------------|
+| `list_devices` | ✅ | ✅ | ✅ | ✅ | List all connected devices |
+| `set_device` | ✅ | ✅ | ✅ | ✅ | Select active device |
+| `screenshot` | ✅ | ✅ | ✅ | ✅ | Take screenshot |
+| `tap` | ✅ | ✅ | ✅ | ⚠️ | Tap at coordinates or by text (requires Python on Aurora) |
+| `long_press` | ✅ | ✅ | ✅ | ✅ | Long press gesture |
+| `swipe` | ✅ | ✅ | ✅ | ⚠️ | Swipe in direction or coordinates (requires Python on Aurora) |
+| `input_text` | ✅ | ✅ | ✅ | ❌ | Type text |
+| `press_key` | ✅ | ✅ | ✅ | ✅ | Press hardware buttons |
+| `launch_app` | ✅ | ✅ | ❌ | ✅ | Launch app |
+| `stop_app` | ✅ | ✅ | ❌ | ✅ | Stop app |
+| `install_app` | ✅ | ✅ | ❌ | ✅ | Install APK/.app/.rpm |
+| `list_apps` | ❌ | ❌ | ❌ | ✅ | List installed apps (Aurora only) |
+| `get_ui` | ✅ | ⚠️ | ✅ | ❌ | Get UI hierarchy |
+| `find_element` | ✅ | ❌ | ✅ | ❌ | Find elements by text/id |
+| `get_current_activity` | ✅ | ❌ | ❌ | ❌ | Get foreground activity |
+| `open_url` | ✅ | ✅ | ❌ | ❌ | Open URL in browser (not yet implemented on Aurora) |
+| `shell` | ✅ | ✅ | ❌ | ✅ | Run shell command |
+| `wait` | ✅ | ✅ | ✅ | ✅ | Wait for duration |
+| `get_logs` | ✅ | ✅ | ❌ | ✅ | Get device logs (logcat/system log) |
+| `clear_logs` | ✅ | ⚠️ | ❌ | ✅ | Clear log buffer |
+| `get_system_info` | ✅ | ❌ | ❌ | ✅ | Battery, memory info |
+| `push_file` | ❌ | ❌ | ❌ | ✅ | Upload file (Aurora only) |
+| `pull_file` | ❌ | ❌ | ❌ | ✅ | Download file (Aurora only) |
 
 ### Desktop-Specific Tools
 
@@ -151,6 +159,7 @@ You can explicitly specify the platform:
 "Screenshot on android"     → Uses Android device
 "Screenshot on ios"         → Uses iOS simulator
 "Screenshot on desktop"     → Uses Desktop app
+"Screenshot on aurora"      → Uses Aurora OS device
 "Screenshot"                → Uses last active device
 ```
 
@@ -160,6 +169,7 @@ Or set the active device:
 "Use the iPhone 15 simulator"
 "Switch to the Android emulator"
 "Switch to desktop"
+"Switch to Aurora device"
 ```
 
 ### Desktop Examples
@@ -176,6 +186,18 @@ Or set the active device:
 "Stop the desktop app"
 ```
 
+### Aurora Examples
+
+```
+"List all Aurora devices"
+"Take a screenshot on Aurora"
+"Tap at coordinates 100, 200 on Aurora"
+"Launch ru.example.app on Aurora"
+"List installed apps on Aurora device"
+"Get logs from Aurora device"
+"Push file.txt to /home/defaultuser/ on Aurora device"
+```
+
 ## How It Works
 
 ```
@@ -187,12 +209,15 @@ Or set the active device:
 │             │     │                  │     └─────────────────┘
 │             │     │                  │     ┌─────────────────┐
 │             │     │                  │────▶│ Desktop (Compose)│
+│             │     │                  │     └─────────────────┘
+│             │     │                  │     ┌─────────────────┐
+│             │     │                  │────▶│ Aurora (audb)   │
 └─────────────┘     └──────────────────┘     └─────────────────┘
 ```
 
 1. Claude sends commands through MCP protocol
-2. Server routes to appropriate platform (ADB, simctl, or Desktop companion)
-3. Commands execute on your device or desktop app
+2. Server routes to appropriate platform (ADB, simctl, Desktop companion, or audb)
+3. Commands execute on your device or desktop app (via ADB, simctl, Desktop companion, or audb)
 4. Results (screenshots, UI data, metrics) return to Claude
 
 ## License

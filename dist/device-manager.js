@@ -2,16 +2,52 @@ import { AdbClient } from "./adb/client.js";
 import { IosClient } from "./ios/client.js";
 import { DesktopClient } from "./desktop/client.js";
 import { compressScreenshot } from "./utils/image.js";
+import { auroraClient as aurora, AuroraClient } from "./aurora/index.js";
 export class DeviceManager {
     androidClient;
     iosClient;
     desktopClient;
+    auroraClient = aurora;
     activeDevice;
     activeTarget = "android";
     constructor() {
         this.androidClient = new AdbClient();
         this.iosClient = new IosClient();
         this.desktopClient = new DesktopClient();
+    }
+    getClient(platform) {
+        const targetPlatform = platform ?? this.activeTarget;
+        if (targetPlatform === "desktop") {
+            if (!this.desktopClient.isRunning()) {
+                throw new Error("Desktop app is not running. Use launch_desktop_app first.");
+            }
+            return this.desktopClient;
+        }
+        if (!targetPlatform || targetPlatform === "android" || targetPlatform === "ios" || targetPlatform === "aurora") {
+            const mobilePlatform = targetPlatform ?? this.activeDevice?.platform;
+            if (!mobilePlatform) {
+                // Try to auto-detect: prefer Android if available
+                const devices = this.getAllDevices().filter(d => d.platform !== "desktop");
+                const booted = devices.find(d => d.state === "device" || d.state === "booted" || d.state === "connected");
+                if (booted) {
+                    this.setDevice(booted.id);
+                    if (booted.platform === "android")
+                        return this.androidClient;
+                    if (booted.platform === "ios")
+                        return this.iosClient;
+                    if (booted.platform === "aurora")
+                        return this.auroraClient;
+                }
+                throw new Error("No active device. Use set_device or list_devices first.");
+            }
+            if (mobilePlatform === "android")
+                return this.androidClient;
+            if (mobilePlatform === "ios")
+                return this.iosClient;
+            if (mobilePlatform === "aurora")
+                return this.auroraClient;
+        }
+        throw new Error(`Unknown platform: ${targetPlatform}`);
     }
     // ============ Target Management ============
     /**
@@ -66,7 +102,7 @@ export class DeviceManager {
     }
     // ============ Device Management ============
     /**
-     * Get all connected devices (Android + iOS)
+     * Get all connected devices (Android + iOS + Aurora)
      */
     getAllDevices() {
         const devices = [];
@@ -113,6 +149,22 @@ export class DeviceManager {
                 isSimulator: false
             });
         }
+        // Get Aurora devices
+        try {
+            const auroraDevices = this.auroraClient.listDevices();
+            for (const d of auroraDevices) {
+                devices.push({
+                    id: d.id,
+                    name: d.name,
+                    platform: "aurora",
+                    state: d.state,
+                    isSimulator: d.isSimulator
+                });
+            }
+        }
+        catch {
+            // audb not available or no devices
+        }
         return devices;
     }
     /**
@@ -147,7 +199,7 @@ export class DeviceManager {
         let device = devices.find(d => d.id === deviceId);
         // If platform specified but device not found, try to match
         if (!device && platform) {
-            device = devices.find(d => d.platform === platform && d.state === "device" || d.state === "booted");
+            device = devices.find(d => d.platform === platform && (d.state === "device" || d.state === "booted" || d.state === "connected"));
         }
         if (!device) {
             throw new Error(`Device not found: ${deviceId}`);
@@ -161,6 +213,7 @@ export class DeviceManager {
         else if (device.platform === "ios") {
             this.iosClient.setDevice(device.id);
         }
+        // Aurora and Desktop don't need explicit device selection
         return device;
     }
     /**
@@ -177,33 +230,6 @@ export class DeviceManager {
             };
         }
         return this.activeDevice;
-    }
-    /**
-     * Get the appropriate client for current device or specified platform
-     */
-    getClient(platform) {
-        const targetPlatform = platform ?? this.activeTarget;
-        if (targetPlatform === "desktop") {
-            if (!this.desktopClient.isRunning()) {
-                throw new Error("Desktop app is not running. Use launch_desktop_app first.");
-            }
-            return this.desktopClient;
-        }
-        if (!targetPlatform || targetPlatform === "android" || targetPlatform === "ios") {
-            const mobilePlatform = targetPlatform ?? this.activeDevice?.platform;
-            if (!mobilePlatform) {
-                // Try to auto-detect: prefer Android if available
-                const devices = this.getAllDevices().filter(d => d.platform !== "desktop");
-                const booted = devices.find(d => d.state === "device" || d.state === "booted");
-                if (booted) {
-                    this.setDevice(booted.id);
-                    return booted.platform === "android" ? this.androidClient : this.iosClient;
-                }
-                throw new Error("No active device. Use set_device or list_devices first.");
-            }
-            return mobilePlatform === "android" ? this.androidClient : this.iosClient;
-        }
-        throw new Error(`Unknown platform: ${targetPlatform}`);
     }
     /**
      * Get current platform
@@ -262,12 +288,13 @@ export class DeviceManager {
         if (client instanceof DesktopClient) {
             await client.longPress(x, y, durationMs);
         }
-        else if (client instanceof AdbClient) {
-            client.longPress(x, y, durationMs);
-        }
-        else {
+        else if (client instanceof IosClient) {
             // iOS: simulate with longer tap
             client.tap(x, y);
+        }
+        else {
+            // Android and Aurora: use longPress
+            client.longPress(x, y, durationMs);
         }
     }
     /**
@@ -392,6 +419,12 @@ export class DeviceManager {
         return this.iosClient;
     }
     /**
+     * Get Aurora client directly
+     */
+    getAuroraClient() {
+        return this.auroraClient;
+    }
+    /**
      * Get device logs
      */
     getLogs(options = {}) {
@@ -410,6 +443,9 @@ export class DeviceManager {
                 lines: options.lines,
                 package: options.package,
             });
+        }
+        else if (client instanceof AuroraClient) {
+            return client.getLogs(options);
         }
         else {
             return client.getLogs({
@@ -452,8 +488,11 @@ export class DeviceManager {
             const memory = client.getMemoryInfo();
             return `=== Battery ===\n${battery}\n\n=== Memory ===\n${memory}`;
         }
+        else if (client instanceof AuroraClient) {
+            return client.getSystemInfo();
+        }
         else {
-            return "System info is only available for Android devices.";
+            return "System info is only available for Android and Aurora devices.";
         }
     }
 }

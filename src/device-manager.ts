@@ -3,8 +3,9 @@ import { IosClient } from "./ios/client.js";
 import { DesktopClient } from "./desktop/client.js";
 import { compressScreenshot, type CompressOptions } from "./utils/image.js";
 import type { LaunchOptions } from "./desktop/types.js";
+import { auroraClient as aurora, AuroraClient } from "./aurora/index.js";
 
-export type Platform = "android" | "ios" | "desktop";
+export type Platform = "android" | "ios" | "desktop" | "aurora";
 
 export interface Device {
   id: string;
@@ -18,6 +19,7 @@ export class DeviceManager {
   private androidClient: AdbClient;
   private iosClient: IosClient;
   private desktopClient: DesktopClient;
+  private auroraClient = aurora;
   private activeDevice?: Device;
   private activeTarget: Platform = "android";
 
@@ -25,6 +27,40 @@ export class DeviceManager {
     this.androidClient = new AdbClient();
     this.iosClient = new IosClient();
     this.desktopClient = new DesktopClient();
+  }
+
+  private getClient(platform?: Platform): AdbClient | IosClient | DesktopClient | AuroraClient {
+    const targetPlatform = platform ?? this.activeTarget;
+
+    if (targetPlatform === "desktop") {
+      if (!this.desktopClient.isRunning()) {
+        throw new Error("Desktop app is not running. Use launch_desktop_app first.");
+      }
+      return this.desktopClient;
+    }
+
+    if (!targetPlatform || targetPlatform === "android" || targetPlatform === "ios" || targetPlatform === "aurora") {
+      const mobilePlatform = targetPlatform ?? this.activeDevice?.platform;
+
+      if (!mobilePlatform) {
+        // Try to auto-detect: prefer Android if available
+        const devices = this.getAllDevices().filter(d => d.platform !== "desktop");
+        const booted = devices.find(d => d.state === "device" || d.state === "booted" || d.state === "connected");
+        if (booted) {
+          this.setDevice(booted.id);
+          if (booted.platform === "android") return this.androidClient;
+          if (booted.platform === "ios") return this.iosClient;
+          if (booted.platform === "aurora") return this.auroraClient;
+        }
+        throw new Error("No active device. Use set_device or list_devices first.");
+      }
+
+      if (mobilePlatform === "android") return this.androidClient;
+      if (mobilePlatform === "ios") return this.iosClient;
+      if (mobilePlatform === "aurora") return this.auroraClient;
+    }
+
+    throw new Error(`Unknown platform: ${targetPlatform}`);
   }
 
   // ============ Target Management ============
@@ -91,7 +127,7 @@ export class DeviceManager {
   // ============ Device Management ============
 
   /**
-   * Get all connected devices (Android + iOS)
+   * Get all connected devices (Android + iOS + Aurora)
    */
   getAllDevices(): Device[] {
     const devices: Device[] = [];
@@ -140,6 +176,22 @@ export class DeviceManager {
       });
     }
 
+    // Get Aurora devices
+    try {
+      const auroraDevices = this.auroraClient.listDevices();
+      for (const d of auroraDevices) {
+        devices.push({
+          id: d.id,
+          name: d.name,
+          platform: "aurora",
+          state: d.state,
+          isSimulator: d.isSimulator
+        });
+      }
+    } catch {
+      // audb not available or no devices
+    }
+
     return devices;
   }
 
@@ -178,7 +230,7 @@ export class DeviceManager {
 
     // If platform specified but device not found, try to match
     if (!device && platform) {
-      device = devices.find(d => d.platform === platform && d.state === "device" || d.state === "booted");
+      device = devices.find(d => d.platform === platform && (d.state === "device" || d.state === "booted" || d.state === "connected"));
     }
 
     if (!device) {
@@ -194,6 +246,7 @@ export class DeviceManager {
     } else if (device.platform === "ios") {
       this.iosClient.setDevice(device.id);
     }
+    // Aurora and Desktop don't need explicit device selection
 
     return device;
   }
@@ -212,39 +265,6 @@ export class DeviceManager {
       };
     }
     return this.activeDevice;
-  }
-
-  /**
-   * Get the appropriate client for current device or specified platform
-   */
-  private getClient(platform?: Platform): AdbClient | IosClient | DesktopClient {
-    const targetPlatform = platform ?? this.activeTarget;
-
-    if (targetPlatform === "desktop") {
-      if (!this.desktopClient.isRunning()) {
-        throw new Error("Desktop app is not running. Use launch_desktop_app first.");
-      }
-      return this.desktopClient;
-    }
-
-    if (!targetPlatform || targetPlatform === "android" || targetPlatform === "ios") {
-      const mobilePlatform = targetPlatform ?? this.activeDevice?.platform;
-
-      if (!mobilePlatform) {
-        // Try to auto-detect: prefer Android if available
-        const devices = this.getAllDevices().filter(d => d.platform !== "desktop");
-        const booted = devices.find(d => d.state === "device" || d.state === "booted");
-        if (booted) {
-          this.setDevice(booted.id);
-          return booted.platform === "android" ? this.androidClient : this.iosClient;
-        }
-        throw new Error("No active device. Use set_device or list_devices first.");
-      }
-
-      return mobilePlatform === "android" ? this.androidClient : this.iosClient;
-    }
-
-    throw new Error(`Unknown platform: ${targetPlatform}`);
   }
 
   /**
@@ -275,7 +295,7 @@ export class DeviceManager {
     }
 
     // Mobile clients
-    const buffer = (client as AdbClient | IosClient).screenshotRaw();
+    const buffer = (client as AdbClient | IosClient | AuroraClient).screenshotRaw();
     if (compress) {
       return compressScreenshot(buffer, options);
     }
@@ -290,7 +310,7 @@ export class DeviceManager {
     if (client instanceof DesktopClient) {
       throw new Error("Use screenshot() for desktop platform");
     }
-    return (client as AdbClient | IosClient).screenshot();
+    return (client as AdbClient | IosClient | AuroraClient).screenshot();
   }
 
   /**
@@ -302,7 +322,7 @@ export class DeviceManager {
     if (client instanceof DesktopClient) {
       await client.tap(x, y, targetPid);
     } else {
-      (client as AdbClient | IosClient).tap(x, y);
+      (client as AdbClient | IosClient | AuroraClient).tap(x, y);
     }
   }
 
@@ -313,11 +333,12 @@ export class DeviceManager {
     const client = this.getClient(platform);
     if (client instanceof DesktopClient) {
       await client.longPress(x, y, durationMs);
-    } else if (client instanceof AdbClient) {
-      client.longPress(x, y, durationMs);
-    } else {
+    } else if (client instanceof IosClient) {
       // iOS: simulate with longer tap
-      (client as IosClient).tap(x, y);
+      client.tap(x, y);
+    } else {
+      // Android and Aurora: use longPress
+      (client as AdbClient | AuroraClient).longPress(x, y, durationMs);
     }
   }
 
@@ -329,7 +350,7 @@ export class DeviceManager {
     if (client instanceof DesktopClient) {
       await client.swipe(x1, y1, x2, y2, durationMs);
     } else {
-      (client as AdbClient | IosClient).swipe(x1, y1, x2, y2, durationMs);
+      (client as AdbClient | IosClient | AuroraClient).swipe(x1, y1, x2, y2, durationMs);
     }
   }
 
@@ -341,7 +362,7 @@ export class DeviceManager {
     if (client instanceof DesktopClient) {
       await client.swipeDirection(direction);
     } else {
-      (client as AdbClient | IosClient).swipeDirection(direction);
+      (client as AdbClient | IosClient | AuroraClient).swipeDirection(direction);
     }
   }
 
@@ -354,7 +375,7 @@ export class DeviceManager {
     if (client instanceof DesktopClient) {
       await client.inputText(text, targetPid);
     } else {
-      (client as AdbClient | IosClient).inputText(text);
+      (client as AdbClient | IosClient | AuroraClient).inputText(text);
     }
   }
 
@@ -367,7 +388,7 @@ export class DeviceManager {
     if (client instanceof DesktopClient) {
       await client.pressKey(key, undefined, targetPid);
     } else {
-      (client as AdbClient | IosClient).pressKey(key);
+      (client as AdbClient | IosClient | AuroraClient).pressKey(key);
     }
   }
 
@@ -379,7 +400,7 @@ export class DeviceManager {
     if (client instanceof DesktopClient) {
       return client.launchApp(packageOrBundleId);
     }
-    return (client as AdbClient | IosClient).launchApp(packageOrBundleId);
+    return (client as AdbClient | IosClient | AuroraClient).launchApp(packageOrBundleId);
   }
 
   /**
@@ -390,7 +411,7 @@ export class DeviceManager {
     if (client instanceof DesktopClient) {
       client.stopApp(packageOrBundleId);
     } else {
-      (client as AdbClient | IosClient).stopApp(packageOrBundleId);
+      (client as AdbClient | IosClient | AuroraClient).stopApp(packageOrBundleId);
     }
   }
 
@@ -405,7 +426,7 @@ export class DeviceManager {
     if (client instanceof AdbClient) {
       return client.installApk(path);
     } else {
-      return (client as IosClient).installApp(path);
+      return (client as IosClient | AuroraClient).installApp(path);
     }
   }
 
@@ -419,7 +440,7 @@ export class DeviceManager {
       // Format as text for compatibility
       return formatDesktopHierarchy(hierarchy);
     }
-    return (client as AdbClient | IosClient).getUiHierarchy();
+    return (client as AdbClient | IosClient | AuroraClient).getUiHierarchy();
   }
 
   /**
@@ -430,7 +451,7 @@ export class DeviceManager {
     if (client instanceof DesktopClient) {
       return client.shell(command);
     }
-    return (client as AdbClient | IosClient).shell(command);
+    return (client as AdbClient | IosClient | AuroraClient).shell(command);
   }
 
   /**
@@ -445,6 +466,13 @@ export class DeviceManager {
    */
   getIosClient(): IosClient {
     return this.iosClient;
+  }
+
+  /**
+   * Get Aurora client directly
+   */
+  getAuroraClient() {
+    return this.auroraClient;
   }
 
   /**
@@ -475,6 +503,8 @@ export class DeviceManager {
         lines: options.lines,
         package: options.package,
       });
+    } else if (client instanceof AuroraClient) {
+      return client.getLogs(options);
     } else {
       return (client as IosClient).getLogs({
         level: options.level as "debug" | "info" | "default" | "error" | "fault" | undefined,
@@ -501,7 +531,7 @@ export class DeviceManager {
       client.clearLogs();
       return "Logcat buffer cleared";
     } else {
-      return (client as IosClient).clearLogs();
+      return (client as IosClient | AuroraClient).clearLogs();
     }
   }
 
@@ -522,8 +552,10 @@ export class DeviceManager {
       const battery = client.getBatteryInfo();
       const memory = client.getMemoryInfo();
       return `=== Battery ===\n${battery}\n\n=== Memory ===\n${memory}`;
+    } else if (client instanceof AuroraClient) {
+      return client.getSystemInfo();
     } else {
-      return "System info is only available for Android devices.";
+      return "System info is only available for Android and Aurora devices.";
     }
   }
 }

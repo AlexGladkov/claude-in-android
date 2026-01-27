@@ -3,7 +3,8 @@ import { IosClient } from "./ios/client.js";
 import { DesktopClient } from "./desktop/client.js";
 import { type CompressOptions } from "./utils/image.js";
 import type { LaunchOptions } from "./desktop/types.js";
-export type Platform = "android" | "ios" | "desktop";
+import { AuroraClient } from "./aurora/index.js";
+export type Platform = "android" | "ios" | "desktop" | "aurora";
 export interface Device {
     id: string;
     name: string;
@@ -15,9 +16,11 @@ export declare class DeviceManager {
     private androidClient;
     private iosClient;
     private desktopClient;
+    private auroraClient;
     private activeDevice?;
     private activeTarget;
     constructor();
+    private getClient;
     /**
      * Set active target platform
      */
@@ -46,7 +49,7 @@ export declare class DeviceManager {
      */
     isDesktopRunning(): boolean;
     /**
-     * Get all connected devices (Android + iOS)
+     * Get all connected devices (Android + iOS + Aurora)
      */
     getAllDevices(): Device[];
     /**
@@ -61,10 +64,6 @@ export declare class DeviceManager {
      * Get active device
      */
     getActiveDevice(): Device | undefined;
-    /**
-     * Get the appropriate client for current device or specified platform
-     */
-    private getClient;
     /**
      * Get current platform
      */
@@ -137,6 +136,10 @@ export declare class DeviceManager {
      * Get iOS client directly
      */
     getIosClient(): IosClient;
+    /**
+     * Get Aurora client directly
+     */
+    getAuroraClient(): AuroraClient;
     /**
      * Get device logs
      */

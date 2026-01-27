@@ -10,7 +10,7 @@ const deviceManager = new DeviceManager();
 // Platform parameter schema (reused across tools)
 const platformParam = {
     type: "string",
-    enum: ["android", "ios", "desktop"],
+    enum: ["android", "ios", "desktop", "aurora"],
     description: "Target platform. If not specified, uses the active target.",
 };
 // Define tools
@@ -402,13 +402,13 @@ const tools = [
     // ============ Desktop Tools ============
     {
         name: "set_target",
-        description: "Switch the active target between Android, iOS, and Desktop platforms",
+        description: "Switch the active target between Android, iOS, Desktop, and Aurora platforms",
         inputSchema: {
             type: "object",
             properties: {
                 target: {
                     type: "string",
-                    enum: ["android", "ios", "desktop"],
+                    enum: ["android", "ios", "desktop", "aurora"],
                     description: "Target platform to switch to",
                 },
             },
@@ -589,6 +589,44 @@ const tools = [
             required: ["text", "pid"],
         },
     },
+    // ============ Aurora Tools ============
+    {
+        name: "push_file",
+        description: "Upload file to Aurora OS device",
+        inputSchema: {
+            type: "object",
+            properties: {
+                platform: { ...platformParam, const: "aurora" },
+                localPath: { type: "string", description: "Local file path" },
+                remotePath: { type: "string", description: "Remote destination path" },
+            },
+            required: ["localPath", "remotePath"],
+        },
+    },
+    {
+        name: "pull_file",
+        description: "Download file from Aurora OS device",
+        inputSchema: {
+            type: "object",
+            properties: {
+                platform: { const: "aurora" },
+                remotePath: { type: "string", description: "Path to the remote file" },
+                localPath: { type: "string", description: "Optional local path" },
+            },
+            required: ["remotePath"],
+        },
+    },
+    {
+        name: "list_apps",
+        description: "List installed applications on Aurora OS device",
+        inputSchema: {
+            type: "object",
+            properties: {
+                platform: { const: "aurora" },
+            },
+            required: [],
+        },
+    },
 ];
 // Cache for UI elements (to support tap by index)
 let cachedElements = [];
@@ -607,6 +645,7 @@ async function handleTool(name, args) {
             const android = devices.filter(d => d.platform === "android");
             const ios = devices.filter(d => d.platform === "ios");
             const desktop = devices.filter(d => d.platform === "desktop");
+            const aurora = devices.filter(d => d.platform === "aurora");
             let result = "Connected devices:\n";
             if (android.length > 0) {
                 result += "\nAndroid:\n";
@@ -628,6 +667,13 @@ async function handleTool(name, args) {
                 result += "\nDesktop:\n";
                 for (const d of desktop) {
                     const active = activeTarget === "desktop" ? " [ACTIVE]" : "";
+                    result += `  • ${d.id} - ${d.name} (${d.state})${active}\n`;
+                }
+            }
+            if (aurora.length > 0) {
+                result += "\nAurora:\n";
+                for (const d of aurora) {
+                    const active = activeDevice?.id === d.id && activeTarget === "aurora" ? " [ACTIVE]" : "";
                     result += `  • ${d.id} - ${d.name} (${d.state})${active}\n`;
                 }
             }
@@ -788,6 +834,13 @@ async function handleTool(name, args) {
         case "install_app": {
             const result = deviceManager.installApp(args.path, platform);
             return { text: result };
+        }
+        case "list_apps": {
+            if (platform !== "aurora") {
+                return { text: "list_apps is only available for Aurora OS." };
+            }
+            const packages = deviceManager.getAuroraClient().listPackages();
+            return { text: `Installed packages (${packages.length}):\n${packages.join("\n")}` };
         }
         case "get_current_activity": {
             const currentPlatform = platform ?? deviceManager.getCurrentPlatform();
@@ -1003,6 +1056,15 @@ async function handleTool(name, args) {
                 };
             }
         }
+        // ============ Aurora Tools ============
+        case "push_file": {
+            const result = await deviceManager.getAuroraClient().pushFile(args.localPath, args.remotePath);
+            return { text: result };
+        }
+        case "pull_file": {
+            const buffer = await deviceManager.getAuroraClient().pullFile(args.remotePath, args.localPath);
+            return { text: `Downloaded ${args.remotePath} (${buffer.length} bytes)` };
+        }
         default:
             throw new Error(`Unknown tool: ${name}`);
     }
@@ -1010,7 +1072,7 @@ async function handleTool(name, args) {
 // Create server
 const server = new Server({
     name: "claude-mobile",
-    version: "2.7.0",
+    version: "2.8.0",
 }, {
     capabilities: {
         tools: {},
@@ -1067,7 +1129,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 async function main() {
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    console.error("Claude Mobile MCP server running (Android + iOS + Desktop)");
+    console.error("Claude Mobile MCP server running (Android + iOS + Desktop + Aurora)");
 }
 main().catch((error) => {
     console.error("Fatal error:", error);
