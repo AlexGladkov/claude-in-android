@@ -1,6 +1,6 @@
 ---
 name: mobile-tools
-description: "This skill should be used when the user asks to \"take a screenshot\", \"tap on element\", \"swipe up/down\", \"type text\", \"install app\", \"launch app\", \"list devices\", \"dump UI\", \"find element\", \"get logs\", \"push file\", \"get clipboard\", \"reboot device\", or interact with Android devices, iOS simulators, Aurora OS devices, or Compose Desktop apps. Provides CLI commands for mobile device automation across all platforms."
+description: "This skill should be used when the user asks to \"take a screenshot\", \"annotate screenshot\", \"analyze screen\", \"tap on element\", \"find and tap\", \"swipe up/down\", \"long press\", \"type text\", \"press key\", \"install app\", \"launch app\", \"stop app\", \"uninstall app\", \"list devices\", \"dump UI\", \"find element\", \"get logs\", \"clear logs\", \"push file\", \"pull file\", \"get clipboard\", \"set clipboard\", \"reboot device\", \"screen size\", \"current activity\", \"system info\", \"open URL\", \"run shell command\", \"manage windows\", \"get monitors\", or interact with Android devices, iOS simulators, Aurora OS devices, or Desktop apps. Provides CLI commands for mobile device automation across all platforms."
 ---
 
 # mobile-tools CLI
@@ -31,12 +31,14 @@ mobile-tools screenshot android -o screen.png
 
 # Annotated screenshot with element bounds drawn
 mobile-tools annotate android -o annotated.png
+mobile-tools annotate ios -o annotated.png
 
 # Analyze screen structure (Android) — returns categorized elements as JSON
 mobile-tools analyze-screen
 
 # Screen size
 mobile-tools screen-size android
+mobile-tools screen-size ios
 ```
 
 ### Gestures
@@ -162,6 +164,7 @@ mobile-tools system-info aurora
 
 # Current activity
 mobile-tools current-activity android
+mobile-tools current-activity ios
 
 # Reboot
 mobile-tools reboot android
@@ -205,7 +208,7 @@ mobile-tools get-monitors --companion-path /path/to/companion
 | Command | Android | iOS | Aurora | Desktop |
 |---------|---------|-----|--------|---------|
 | screenshot | yes | yes | yes | yes |
-| annotate | yes | no | no | no |
+| annotate | yes | yes | no | no |
 | tap | yes | yes | yes | yes |
 | long-press | yes | yes | yes | no |
 | swipe | yes | yes | yes | no |
@@ -225,8 +228,15 @@ mobile-tools get-monitors --companion-path /path/to/companion
 | pull-file | yes | no | yes | no |
 | clipboard | yes | yes | no | yes |
 | logs | yes | yes | yes | no |
+| clear-logs | yes | yes | yes | no |
 | system-info | yes | yes | yes | no |
+| current-activity | yes | yes | no | no |
+| reboot | yes | yes | no | no |
+| screen (power) | yes | no | no | no |
+| screen-size | yes | yes | no | no |
+| open-url | yes | yes | yes | no |
 | shell | yes | yes | yes | no |
+| wait | n/a | n/a | n/a | n/a |
 | window mgmt | no | no | no | yes |
 | monitors | no | no | no | yes |
 | perf metrics | no | no | no | yes |
