@@ -276,6 +276,9 @@ export class DeviceManager {
         if (client instanceof DesktopClient) {
             await client.tap(x, y, targetPid);
         }
+        else if (client instanceof IosClient) {
+            await client.tap(x, y);
+        }
         else {
             client.tap(x, y);
         }
@@ -305,6 +308,9 @@ export class DeviceManager {
         if (client instanceof DesktopClient) {
             await client.swipe(x1, y1, x2, y2, durationMs);
         }
+        else if (client instanceof IosClient) {
+            await client.swipe(x1, y1, x2, y2, durationMs);
+        }
         else {
             client.swipe(x1, y1, x2, y2, durationMs);
         }
@@ -315,6 +321,9 @@ export class DeviceManager {
     async swipeDirection(direction, platform) {
         const client = this.getClient(platform);
         if (client instanceof DesktopClient) {
+            await client.swipeDirection(direction);
+        }
+        else if (client instanceof IosClient) {
             await client.swipeDirection(direction);
         }
         else {
@@ -393,6 +402,9 @@ export class DeviceManager {
             const hierarchy = await client.getUiHierarchy();
             // Format as text for compatibility
             return formatDesktopHierarchy(hierarchy);
+        }
+        if (client instanceof IosClient) {
+            return await client.getUiHierarchy();
         }
         return client.getUiHierarchy();
     }

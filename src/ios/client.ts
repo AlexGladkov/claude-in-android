@@ -2,6 +2,7 @@ import { execSync } from "child_process";
 import { tmpdir } from "os";
 import { join } from "path";
 import { readFileSync, unlinkSync } from "fs";
+import { WDAManager, WDAClient, WDAElement, WDARect } from "./wda/index.js";
 
 export interface IosDevice {
   id: string;
@@ -13,9 +14,26 @@ export interface IosDevice {
 
 export class IosClient {
   private deviceId?: string;
+  private wdaManager: WDAManager = new WDAManager();
+  private wdaClient?: WDAClient;
 
   constructor(deviceId?: string) {
     this.deviceId = deviceId;
+  }
+
+  private async ensureWDA(): Promise<WDAClient> {
+    if (!this.deviceId) {
+      const booted = this.getBootedDevices();
+      if (booted.length === 0) {
+        throw new Error("No booted iOS simulator found. Boot a simulator first.");
+      }
+      this.deviceId = booted[0].id;
+    }
+
+    if (!this.wdaClient) {
+      this.wdaClient = await this.wdaManager.ensureWDAReady(this.deviceId);
+    }
+    return this.wdaClient;
   }
 
   /**
@@ -122,75 +140,41 @@ export class IosClient {
   /**
    * Tap at coordinates
    */
-  tap(x: number, y: number): void {
-    // Use AppleScript to send tap via Simulator app
-    const script = `
-      tell application "Simulator"
-        activate
-      end tell
-      delay 0.1
-      tell application "System Events"
-        click at {${x}, ${y}}
-      end tell
-    `;
-
-    // Alternative: use simctl with booted device
-    // For now, use a Python approach with Quartz
-    execSync(`python3 -c "
-import Quartz
-import time
-
-# Get simulator window position offset (approximately)
-event = Quartz.CGEventCreateMouseEvent(None, Quartz.kCGEventLeftMouseDown, (${x}, ${y}), Quartz.kCGMouseButtonLeft)
-Quartz.CGEventPost(Quartz.kCGHIDEventTap, event)
-time.sleep(0.05)
-event = Quartz.CGEventCreateMouseEvent(None, Quartz.kCGEventLeftMouseUp, (${x}, ${y}), Quartz.kCGMouseButtonLeft)
-Quartz.CGEventPost(Quartz.kCGHIDEventTap, event)
-" 2>/dev/null || echo "Tap sent"`, { encoding: "utf-8" });
+  async tap(x: number, y: number): Promise<void> {
+    try {
+      const wdaClient = await this.ensureWDA();
+      await wdaClient.tapByCoordinates(x, y);
+    } catch (error: any) {
+      throw new Error(
+        `Tap requires WebDriverAgent.\n\n` +
+        `Install: npm install -g appium && appium driver install xcuitest\n` +
+        `Or set WDA_PATH environment variable.\n\n` +
+        `Error: ${error.message}`
+      );
+    }
   }
 
   /**
    * Swipe gesture
    */
-  swipe(x1: number, y1: number, x2: number, y2: number, durationMs: number = 300): void {
-    // Use simctl for swipe
-    const steps = Math.max(10, Math.floor(durationMs / 16));
-    const deltaX = (x2 - x1) / steps;
-    const deltaY = (y2 - y1) / steps;
-
-    // Generate touch events via simctl io
-    // This is simplified - real implementation would need proper touch simulation
-    execSync(`python3 -c "
-import Quartz
-import time
-
-steps = ${steps}
-x1, y1 = ${x1}, ${y1}
-dx, dy = ${deltaX}, ${deltaY}
-duration = ${durationMs} / 1000.0
-
-# Mouse down
-event = Quartz.CGEventCreateMouseEvent(None, Quartz.kCGEventLeftMouseDown, (x1, y1), Quartz.kCGMouseButtonLeft)
-Quartz.CGEventPost(Quartz.kCGHIDEventTap, event)
-
-# Drag
-for i in range(steps):
-    x = x1 + dx * i
-    y = y1 + dy * i
-    event = Quartz.CGEventCreateMouseEvent(None, Quartz.kCGEventLeftMouseDragged, (x, y), Quartz.kCGMouseButtonLeft)
-    Quartz.CGEventPost(Quartz.kCGHIDEventTap, event)
-    time.sleep(duration / steps)
-
-# Mouse up
-event = Quartz.CGEventCreateMouseEvent(None, Quartz.kCGEventLeftMouseUp, (${x2}, ${y2}), Quartz.kCGMouseButtonLeft)
-Quartz.CGEventPost(Quartz.kCGHIDEventTap, event)
-" 2>/dev/null || echo "Swipe sent"`, { encoding: "utf-8" });
+  async swipe(x1: number, y1: number, x2: number, y2: number, durationMs: number = 300): Promise<void> {
+    try {
+      const wdaClient = await this.ensureWDA();
+      await wdaClient.swipe(x1, y1, x2, y2, durationMs);
+    } catch (error: any) {
+      throw new Error(
+        `Swipe requires WebDriverAgent.\n\n` +
+        `Install: npm install -g appium && appium driver install xcuitest\n` +
+        `Or set WDA_PATH environment variable.\n\n` +
+        `Error: ${error.message}`
+      );
+    }
   }
 
   /**
    * Swipe in direction
    */
-  swipeDirection(direction: "up" | "down" | "left" | "right", distance: number = 400): void {
+  async swipeDirection(direction: "up" | "down" | "left" | "right", distance: number = 400): Promise<void> {
     // Default to center of typical simulator screen
     const centerX = 200;
     const centerY = 400;
@@ -203,7 +187,7 @@ Quartz.CGEventPost(Quartz.kCGHIDEventTap, event)
     };
 
     const [x1, y1, x2, y2] = coords[direction];
-    this.swipe(x1, y1, x2, y2);
+    await this.swipe(x1, y1, x2, y2);
   }
 
   /**
@@ -279,10 +263,97 @@ Quartz.CGEventPost(Quartz.kCGHIDEventTap, event)
    * Get UI hierarchy (limited on iOS simulator)
    * Returns accessibility info if available
    */
-  getUiHierarchy(): string {
-    // iOS doesn't have direct UI dump like Android
-    // This is a placeholder - would need Accessibility Inspector or XCTest
-    return "<hierarchy><note>iOS UI hierarchy requires WebDriverAgent or Accessibility Inspector</note></hierarchy>";
+  async getUiHierarchy(): Promise<string> {
+    try {
+      const wdaClient = await this.ensureWDA();
+      const tree = await wdaClient.getAccessibleSource();
+      return JSON.stringify(tree, null, 2);
+    } catch (error: any) {
+      throw new Error(
+        `WebDriverAgent required for iOS UI inspection.\n\n` +
+        `Install: npm install -g appium && appium driver install xcuitest\n` +
+        `Or set WDA_PATH environment variable.\n\n` +
+        `Error: ${error.message}`
+      );
+    }
+  }
+
+  /**
+   * Find element by text or label
+   */
+  async findElement(criteria: { text?: string; label?: string }): Promise<WDAElement> {
+    const wdaClient = await this.ensureWDA();
+
+    if (criteria.label) {
+      return await wdaClient.findElement("accessibility id", criteria.label);
+    }
+    if (criteria.text) {
+      return await wdaClient.findElement("name", criteria.text);
+    }
+
+    throw new Error("Provide text or label to find element");
+  }
+
+  /**
+   * Find multiple elements by criteria
+   */
+  async findElements(criteria: {
+    text?: string;
+    label?: string;
+    type?: string;
+    visible?: boolean;
+  }): Promise<Array<{ id: string; type: string; label: string; rect: WDARect }>> {
+    const wdaClient = await this.ensureWDA();
+    const elements: WDAElement[] = [];
+
+    if (criteria.text) {
+      const found = await wdaClient.findElements("name", criteria.text);
+      elements.push(...found);
+    }
+    if (criteria.label) {
+      const found = await wdaClient.findElements("accessibility id", criteria.label);
+      elements.push(...found);
+    }
+    if (criteria.type) {
+      const found = await wdaClient.findElements("class name", criteria.type);
+      elements.push(...found);
+    }
+
+    const results = await Promise.all(
+      elements.map(async (el) => {
+        try {
+          const rect = await wdaClient.getElementRect(el.ELEMENT);
+          const text = await wdaClient.getElementText(el.ELEMENT).catch(() => "");
+          const displayed =
+            criteria.visible !== undefined
+              ? await wdaClient.isElementDisplayed(el.ELEMENT)
+              : true;
+
+          if (criteria.visible !== undefined && displayed !== criteria.visible) {
+            return null;
+          }
+
+          return {
+            id: el.ELEMENT,
+            type: criteria.type || "Unknown",
+            label: text,
+            rect,
+          };
+        } catch {
+          return null;
+        }
+      })
+    );
+
+    return results.filter((r): r is NonNullable<typeof r> => r !== null);
+  }
+
+  /**
+   * Tap element by element ID
+   */
+  async tapElement(elementId: string): Promise<void> {
+    const wdaClient = await this.ensureWDA();
+    await wdaClient.clickElement(elementId);
   }
 
   /**

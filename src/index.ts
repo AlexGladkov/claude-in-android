@@ -128,7 +128,11 @@ const tools: Tool[] = [
         },
         text: {
           type: "string",
-          description: "Find element containing this text and tap it (Android only)",
+          description: "Android: Element text. iOS: Element name (less reliable than label)",
+        },
+        label: {
+          type: "string",
+          description: "iOS only: Accessibility label (most reliable)",
         },
         resourceId: {
           type: "string",
@@ -249,7 +253,7 @@ const tools: Tool[] = [
   },
   {
     name: "find_element",
-    description: "Find UI elements by text, resource ID, or other criteria (Android only)",
+    description: "Find UI elements by text, resource ID, or other criteria. Android: resourceId, className. iOS: label (accessibility id)",
     inputSchema: {
       type: "object",
       properties: {
@@ -257,17 +261,25 @@ const tools: Tool[] = [
           type: "string",
           description: "Find by text (partial match, case-insensitive)",
         },
+        label: {
+          type: "string",
+          description: "iOS: Find by accessibility label",
+        },
         resourceId: {
           type: "string",
-          description: "Find by resource ID (partial match)",
+          description: "Android: Find by resource ID (partial match)",
         },
         className: {
           type: "string",
-          description: "Find by class name",
+          description: "Find by class name (Android: full class, iOS: XCUIElementType*)",
         },
         clickable: {
           type: "boolean",
-          description: "Filter by clickable state",
+          description: "Android: Filter by clickable state",
+        },
+        visible: {
+          type: "boolean",
+          description: "iOS: Filter by visibility",
         },
         platform: platformParam,
       },
@@ -652,6 +664,44 @@ const tools: Tool[] = [
 // Cache for UI elements (to support tap by index)
 let cachedElements: UiElement[] = [];
 
+// Helper to format iOS UI tree
+function formatIOSUITree(tree: any, indent = 0): string {
+  const lines: string[] = [];
+  const prefix = '  '.repeat(indent);
+
+  if (tree.type) {
+    const parts: string[] = [`<${tree.type}>`];
+
+    // Add label (accessibility label)
+    if (tree.label) parts.push(`label="${tree.label}"`);
+
+    // Add value (text content)
+    if (tree.value) parts.push(`value="${tree.value}"`);
+
+    // Add name (element name/identifier)
+    if (tree.name) parts.push(`name="${tree.name}"`);
+
+    // Add identifier (accessibility id)
+    if (tree.identifier) parts.push(`id="${tree.identifier}"`);
+
+    // Add enabled state
+    if (tree.enabled !== undefined) parts.push(`enabled=${tree.enabled}`);
+
+    // Add coordinates
+    if (tree.rect) parts.push(`@ (${tree.rect.x}, ${tree.rect.y})`);
+
+    lines.push(`${prefix}${parts.join(' ')}`);
+  }
+
+  if (tree.children) {
+    for (const child of tree.children) {
+      lines.push(formatIOSUITree(child, indent + 1));
+    }
+  }
+
+  return lines.join('\n');
+}
+
 // Tool handlers
 async function handleTool(name: string, args: Record<string, unknown>): Promise<unknown> {
   const platform = args.platform as Platform | undefined;
@@ -737,7 +787,18 @@ async function handleTool(name: string, args: Record<string, unknown>): Promise<
       const currentPlatform = platform ?? deviceManager.getCurrentPlatform();
 
       if (currentPlatform === "ios") {
-        return { text: "iOS UI hierarchy is limited. Use screenshot + tap by coordinates, or integrate WebDriverAgent for full UI inspection." };
+        try {
+          const json = await deviceManager.getUiHierarchy("ios");
+          const tree = JSON.parse(json);
+          const formatted = formatIOSUITree(tree);
+          return { text: formatted };
+        } catch (error: any) {
+          return {
+            text: `iOS UI inspection requires WebDriverAgent.\n\n` +
+                  `Install: npm install -g appium && appium driver install xcuitest\n\n` +
+                  `Error: ${error.message}`
+          };
+        }
       }
 
       // Desktop returns pre-formatted text from DeviceManager
@@ -759,6 +820,21 @@ async function handleTool(name: string, args: Record<string, unknown>): Promise<
       let x: number | undefined = args.x as number;
       let y: number | undefined = args.y as number;
       const currentPlatform = platform ?? deviceManager.getCurrentPlatform();
+
+      // iOS element-based tap (precedence: label > text > coordinates)
+      if (currentPlatform === "ios" && (args.label || args.text)) {
+        try {
+          const iosClient = deviceManager.getIosClient();
+          const element = await iosClient.findElement({
+            text: args.text as string,
+            label: args.label as string
+          });
+          await iosClient.tapElement(element.ELEMENT);
+          return { text: `Tapped element: ${args.label || args.text}` };
+        } catch (error: any) {
+          return { text: `Element not found: ${args.label || args.text}\n${error.message}` };
+        }
+      }
 
       // Find by index from cached elements (Android only)
       if (args.index !== undefined && currentPlatform === "android") {
@@ -798,7 +874,7 @@ async function handleTool(name: string, args: Record<string, unknown>): Promise<
       }
 
       if (x === undefined || y === undefined) {
-        return { text: "Please provide x,y coordinates, text, resourceId, or index" };
+        return { text: "Please provide x,y coordinates, text, resourceId, label, or index" };
       }
 
       const targetPid = args.targetPid as number | undefined;
@@ -870,7 +946,30 @@ async function handleTool(name: string, args: Record<string, unknown>): Promise<
       const currentPlatform = platform ?? deviceManager.getCurrentPlatform();
 
       if (currentPlatform === "ios") {
-        return { text: "find_element is only available for Android. Use screenshot + tap by coordinates for iOS." };
+        try {
+          const iosClient = deviceManager.getIosClient();
+          const elements = await iosClient.findElements({
+            text: args.text as string,
+            label: args.label as string,
+            type: args.className as string,
+            visible: args.visible as boolean
+          });
+
+          if (elements.length === 0) {
+            return { text: "No elements found" };
+          }
+
+          const list = elements.slice(0, 20).map((el, i) =>
+            `[${i}] <${el.type}> "${el.label}" @ (${el.rect.x}, ${el.rect.y})`
+          ).join('\n');
+
+          return { text: `Found ${elements.length} element(s):\n${list}` };
+        } catch (error: any) {
+          return {
+            text: `Find element failed: ${error.message}\n\n` +
+                  `Make sure WebDriverAgent is installed (see get_ui error for details)`
+          };
+        }
       }
 
       const xml = await deviceManager.getUiHierarchy("android");

@@ -321,8 +321,10 @@ export class DeviceManager {
     const client = this.getClient(platform);
     if (client instanceof DesktopClient) {
       await client.tap(x, y, targetPid);
+    } else if (client instanceof IosClient) {
+      await client.tap(x, y);
     } else {
-      (client as AdbClient | IosClient | AuroraClient).tap(x, y);
+      (client as AdbClient | AuroraClient).tap(x, y);
     }
   }
 
@@ -349,8 +351,10 @@ export class DeviceManager {
     const client = this.getClient(platform);
     if (client instanceof DesktopClient) {
       await client.swipe(x1, y1, x2, y2, durationMs);
+    } else if (client instanceof IosClient) {
+      await client.swipe(x1, y1, x2, y2, durationMs);
     } else {
-      (client as AdbClient | IosClient | AuroraClient).swipe(x1, y1, x2, y2, durationMs);
+      (client as AdbClient | AuroraClient).swipe(x1, y1, x2, y2, durationMs);
     }
   }
 
@@ -361,8 +365,10 @@ export class DeviceManager {
     const client = this.getClient(platform);
     if (client instanceof DesktopClient) {
       await client.swipeDirection(direction);
+    } else if (client instanceof IosClient) {
+      await client.swipeDirection(direction);
     } else {
-      (client as AdbClient | IosClient | AuroraClient).swipeDirection(direction);
+      (client as AdbClient | AuroraClient).swipeDirection(direction);
     }
   }
 
@@ -440,7 +446,10 @@ export class DeviceManager {
       // Format as text for compatibility
       return formatDesktopHierarchy(hierarchy);
     }
-    return (client as AdbClient | IosClient | AuroraClient).getUiHierarchy();
+    if (client instanceof IosClient) {
+      return await client.getUiHierarchy();
+    }
+    return (client as AdbClient | AuroraClient).getUiHierarchy();
   }
 
   /**

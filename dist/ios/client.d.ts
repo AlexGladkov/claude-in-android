@@ -1,3 +1,4 @@
+import { WDAElement, WDARect } from "./wda/index.js";
 export interface IosDevice {
     id: string;
     name: string;
@@ -7,7 +8,10 @@ export interface IosDevice {
 }
 export declare class IosClient {
     private deviceId?;
+    private wdaManager;
+    private wdaClient?;
     constructor(deviceId?: string);
+    private ensureWDA;
     /**
      * Execute simctl command
      */
@@ -47,15 +51,15 @@ export declare class IosClient {
     /**
      * Tap at coordinates
      */
-    tap(x: number, y: number): void;
+    tap(x: number, y: number): Promise<void>;
     /**
      * Swipe gesture
      */
-    swipe(x1: number, y1: number, x2: number, y2: number, durationMs?: number): void;
+    swipe(x1: number, y1: number, x2: number, y2: number, durationMs?: number): Promise<void>;
     /**
      * Swipe in direction
      */
-    swipeDirection(direction: "up" | "down" | "left" | "right", distance?: number): void;
+    swipeDirection(direction: "up" | "down" | "left" | "right", distance?: number): Promise<void>;
     /**
      * Input text using simctl
      */
@@ -84,7 +88,32 @@ export declare class IosClient {
      * Get UI hierarchy (limited on iOS simulator)
      * Returns accessibility info if available
      */
-    getUiHierarchy(): string;
+    getUiHierarchy(): Promise<string>;
+    /**
+     * Find element by text or label
+     */
+    findElement(criteria: {
+        text?: string;
+        label?: string;
+    }): Promise<WDAElement>;
+    /**
+     * Find multiple elements by criteria
+     */
+    findElements(criteria: {
+        text?: string;
+        label?: string;
+        type?: string;
+        visible?: boolean;
+    }): Promise<Array<{
+        id: string;
+        type: string;
+        label: string;
+        rect: WDARect;
+    }>>;
+    /**
+     * Tap element by element ID
+     */
+    tapElement(elementId: string): Promise<void>;
     /**
      * Open URL in simulator
      */
