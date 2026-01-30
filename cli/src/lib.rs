@@ -1,4 +1,4 @@
-//! mobile-tools library - shared types and utilities
+//! claude-in-mobile library - shared types and utilities
 
 pub mod android;
 pub mod aurora;

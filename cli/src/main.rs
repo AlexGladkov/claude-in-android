@@ -1,4 +1,4 @@
-//! mobile-tools - Fast CLI for mobile device automation
+//! claude-in-mobile - Fast CLI for mobile device automation
 //!
 //! Supports Android (via ADB), iOS (via simctl), Aurora (via audb), Desktop (via companion app)
 
@@ -14,7 +14,7 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "mobile-tools")]
+#[command(name = "claude-in-mobile")]
 #[command(about = "Fast CLI for mobile device automation (Android/iOS/Aurora/Desktop)")]
 #[command(version)]
 struct Cli {

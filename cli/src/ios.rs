@@ -710,7 +710,7 @@ pub fn clear_logs(simulator: Option<&str>) -> Result<()> {
 
     // Fallback: log erase requires root, inform user
     println!("Note: log erase requires elevated privileges on iOS simulator");
-    println!("Workaround: reboot simulator to clear logs (mobile-tools reboot ios)");
+    println!("Workaround: reboot simulator to clear logs (claude-in-mobile reboot ios)");
     Ok(())
 }
 

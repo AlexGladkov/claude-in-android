@@ -1,13 +1,13 @@
 ---
-name: mobile-tools
+name: claude-in-mobile
 description: "This skill should be used when the user asks to interact with device screens (screenshot, annotate, tap, swipe, type text), manage apps (install, launch, stop, uninstall), transfer files (push, pull), query device info (logs, system info, clipboard, screen size), run shell commands, manage desktop windows, or automate Android, iOS, Aurora OS, or Desktop apps."
 ---
 
-# mobile-tools CLI
+# claude-in-mobile CLI
 
 Fast CLI for mobile device automation across **Android** (via ADB), **iOS** (via simctl), **Aurora OS** (via audb), and **Desktop** (via companion JSON-RPC app).
 
-Binary: `mobile-tools` (ensure it's in PATH or use full path to the built binary).
+Binary: `claude-in-mobile` (ensure it's in PATH or use full path to the built binary).
 
 ## Common Flags
 
@@ -28,10 +28,10 @@ Most commands accept platform-specific device selectors:
 List connected devices across platforms.
 
 ```bash
-mobile-tools devices              # All platforms
-mobile-tools devices android      # Android only
-mobile-tools devices ios          # iOS simulators only
-mobile-tools devices aurora       # Aurora devices only
+claude-in-mobile devices              # All platforms
+claude-in-mobile devices android      # Android only
+claude-in-mobile devices ios          # iOS simulators only
+claude-in-mobile devices aurora       # Aurora devices only
 ```
 
 **Platforms:** Android, iOS, Aurora
@@ -43,16 +43,16 @@ mobile-tools devices aurora       # Aurora devices only
 Capture a screenshot. Outputs base64 to stdout by default, or save to file with `-o`.
 
 ```bash
-mobile-tools screenshot android
-mobile-tools screenshot ios
-mobile-tools screenshot aurora
-mobile-tools screenshot desktop --companion-path /path/to/companion
+claude-in-mobile screenshot android
+claude-in-mobile screenshot ios
+claude-in-mobile screenshot aurora
+claude-in-mobile screenshot desktop --companion-path /path/to/companion
 
 # Save to file
-mobile-tools screenshot android -o screen.png
+claude-in-mobile screenshot android -o screen.png
 
 # Compress for LLM (resize + JPEG quality reduction)
-mobile-tools screenshot android --compress --max-width 800 --quality 60
+claude-in-mobile screenshot android --compress --max-width 800 --quality 60
 ```
 
 | Flag | Description | Default |
@@ -73,8 +73,8 @@ mobile-tools screenshot android --compress --max-width 800 --quality 60
 Capture screenshot with UI element bounding boxes drawn over it. Useful for visual debugging and identifying tap targets.
 
 ```bash
-mobile-tools annotate android -o annotated.png
-mobile-tools annotate ios -o annotated.png
+claude-in-mobile annotate android -o annotated.png
+claude-in-mobile annotate ios -o annotated.png
 ```
 
 | Flag | Description |
@@ -90,8 +90,8 @@ mobile-tools annotate ios -o annotated.png
 Parse current screen and return categorized interactive elements as structured JSON. Groups elements into buttons, inputs, texts, etc. Useful for automated test flows.
 
 ```bash
-mobile-tools analyze-screen
-mobile-tools analyze-screen --device emulator-5554
+claude-in-mobile analyze-screen
+claude-in-mobile analyze-screen --device emulator-5554
 ```
 
 **Platforms:** Android only
@@ -103,8 +103,8 @@ mobile-tools analyze-screen --device emulator-5554
 Get screen resolution in pixels.
 
 ```bash
-mobile-tools screen-size android
-mobile-tools screen-size ios
+claude-in-mobile screen-size android
+claude-in-mobile screen-size ios
 ```
 
 **Platforms:** Android, iOS
@@ -117,20 +117,20 @@ Tap at exact coordinates, or by text/resource-id/index.
 
 ```bash
 # By coordinates
-mobile-tools tap android 500 800
-mobile-tools tap ios 200 400
-mobile-tools tap aurora 300 600
-mobile-tools tap desktop 100 200 --companion-path /path/to/companion
+claude-in-mobile tap android 500 800
+claude-in-mobile tap ios 200 400
+claude-in-mobile tap aurora 300 600
+claude-in-mobile tap desktop 100 200 --companion-path /path/to/companion
 
 # By text (searches UI tree, finds element, taps center)
-mobile-tools tap android 0 0 --text "Login"
-mobile-tools tap desktop 0 0 --text "Submit" --companion-path /path/to/companion
+claude-in-mobile tap android 0 0 --text "Login"
+claude-in-mobile tap desktop 0 0 --text "Submit" --companion-path /path/to/companion
 
 # By resource-id (Android)
-mobile-tools tap android 0 0 --resource-id "btn_login"
+claude-in-mobile tap android 0 0 --resource-id "btn_login"
 
 # By element index from ui-dump (Android)
-mobile-tools tap android 0 0 --index 5
+claude-in-mobile tap android 0 0 --index 5
 ```
 
 | Flag | Description | Platforms |
@@ -148,8 +148,8 @@ mobile-tools tap android 0 0 --index 5
 Find an element by text, resource-id, or content-desc in the UI hierarchy and tap it. Shortcut for `find` + `tap`.
 
 ```bash
-mobile-tools tap-text android "Submit"
-mobile-tools tap-text ios "Login"
+claude-in-mobile tap-text android "Submit"
+claude-in-mobile tap-text ios "Login"
 ```
 
 **Platforms:** Android, iOS
@@ -161,8 +161,8 @@ mobile-tools tap-text ios "Login"
 Search UI hierarchy for an element by text, resource-id, or content-desc. Returns element coordinates and bounds.
 
 ```bash
-mobile-tools find android "Login"
-mobile-tools find ios "Submit"
+claude-in-mobile find android "Login"
+claude-in-mobile find ios "Submit"
 ```
 
 **Platforms:** Android, iOS
@@ -174,8 +174,8 @@ mobile-tools find ios "Submit"
 Fuzzy-match an element by description and tap it. Uses confidence scoring for inexact matches.
 
 ```bash
-mobile-tools find-and-tap "Submit Order" --min-confidence 50
-mobile-tools find-and-tap "Cancel" --min-confidence 30
+claude-in-mobile find-and-tap "Submit Order" --min-confidence 50
+claude-in-mobile find-and-tap "Cancel" --min-confidence 30
 ```
 
 | Flag | Description | Default |
@@ -192,12 +192,12 @@ Long press at coordinates or by text. Duration configurable in milliseconds.
 
 ```bash
 # By coordinates
-mobile-tools long-press android 500 800 -d 2000
-mobile-tools long-press ios 300 600
-mobile-tools long-press aurora 400 700
+claude-in-mobile long-press android 500 800 -d 2000
+claude-in-mobile long-press ios 300 600
+claude-in-mobile long-press aurora 400 700
 
 # By text (Android: finds element, long presses at center)
-mobile-tools long-press android 0 0 --text "Delete"
+claude-in-mobile long-press android 0 0 --text "Delete"
 ```
 
 | Flag | Description | Default |
@@ -215,12 +215,12 @@ Swipe gesture between coordinates, or by named direction (up/down/left/right).
 
 ```bash
 # By coordinates (x1 y1 x2 y2)
-mobile-tools swipe android 500 1500 500 500 -d 300
+claude-in-mobile swipe android 500 1500 500 500 -d 300
 
 # By direction (uses screen center, swipes 400px)
-mobile-tools swipe android 0 0 0 0 --direction up
-mobile-tools swipe ios 0 0 0 0 --direction left
-mobile-tools swipe aurora 0 0 0 0 --direction down
+claude-in-mobile swipe android 0 0 0 0 --direction up
+claude-in-mobile swipe ios 0 0 0 0 --direction left
+claude-in-mobile swipe aurora 0 0 0 0 --direction down
 ```
 
 | Flag | Description | Default |
@@ -237,10 +237,10 @@ mobile-tools swipe aurora 0 0 0 0 --direction down
 Type text into the currently focused field.
 
 ```bash
-mobile-tools input android "Hello world"
-mobile-tools input ios "Search query"
-mobile-tools input aurora "user@example.com"
-mobile-tools input desktop "text" --companion-path /path/to/companion
+claude-in-mobile input android "Hello world"
+claude-in-mobile input ios "Search query"
+claude-in-mobile input aurora "user@example.com"
+claude-in-mobile input desktop "text" --companion-path /path/to/companion
 ```
 
 **Platforms:** Android, iOS, Aurora, Desktop
@@ -252,13 +252,13 @@ mobile-tools input desktop "text" --companion-path /path/to/companion
 Press a hardware/software key or button.
 
 ```bash
-mobile-tools key android back
-mobile-tools key android home
-mobile-tools key android enter
-mobile-tools key android power
-mobile-tools key ios home
-mobile-tools key aurora back
-mobile-tools key desktop enter --companion-path /path/to/companion
+claude-in-mobile key android back
+claude-in-mobile key android home
+claude-in-mobile key android enter
+claude-in-mobile key android power
+claude-in-mobile key ios home
+claude-in-mobile key aurora back
+claude-in-mobile key desktop enter --companion-path /path/to/companion
 ```
 
 Common keys: `home`, `back`, `enter`, `power`, `volume_up`, `volume_down`, `tab`, `delete`.
@@ -272,10 +272,10 @@ Common keys: `home`, `back`, `enter`, `power`, `volume_up`, `volume_down`, `tab`
 Dump the current UI hierarchy. Default format is JSON; also supports XML for Android.
 
 ```bash
-mobile-tools ui-dump android
-mobile-tools ui-dump android -f xml
-mobile-tools ui-dump ios
-mobile-tools ui-dump desktop --companion-path /path/to/companion
+claude-in-mobile ui-dump android
+claude-in-mobile ui-dump android -f xml
+claude-in-mobile ui-dump ios
+claude-in-mobile ui-dump desktop --companion-path /path/to/companion
 ```
 
 | Flag | Description | Default |
@@ -292,10 +292,10 @@ mobile-tools ui-dump desktop --companion-path /path/to/companion
 List installed applications, optionally filtered by name.
 
 ```bash
-mobile-tools apps android
-mobile-tools apps android -f "myapp"
-mobile-tools apps ios
-mobile-tools apps aurora
+claude-in-mobile apps android
+claude-in-mobile apps android -f "myapp"
+claude-in-mobile apps ios
+claude-in-mobile apps aurora
 ```
 
 | Flag | Description |
@@ -311,10 +311,10 @@ mobile-tools apps aurora
 Launch an application by package name, bundle ID, or path.
 
 ```bash
-mobile-tools launch android com.example.app
-mobile-tools launch ios com.example.app
-mobile-tools launch aurora harbour-myapp
-mobile-tools launch desktop /path/to/app --companion-path /path/to/companion
+claude-in-mobile launch android com.example.app
+claude-in-mobile launch ios com.example.app
+claude-in-mobile launch aurora harbour-myapp
+claude-in-mobile launch desktop /path/to/app --companion-path /path/to/companion
 ```
 
 **Platforms:** Android, iOS, Aurora, Desktop
@@ -326,10 +326,10 @@ mobile-tools launch desktop /path/to/app --companion-path /path/to/companion
 Force-stop/kill an application.
 
 ```bash
-mobile-tools stop android com.example.app
-mobile-tools stop ios com.example.app
-mobile-tools stop aurora harbour-myapp
-mobile-tools stop desktop "AppName" --companion-path /path/to/companion
+claude-in-mobile stop android com.example.app
+claude-in-mobile stop ios com.example.app
+claude-in-mobile stop aurora harbour-myapp
+claude-in-mobile stop desktop "AppName" --companion-path /path/to/companion
 ```
 
 **Platforms:** Android, iOS, Aurora, Desktop
@@ -341,9 +341,9 @@ mobile-tools stop desktop "AppName" --companion-path /path/to/companion
 Install an application package onto the device.
 
 ```bash
-mobile-tools install android /path/to/app.apk
-mobile-tools install ios /path/to/app.app
-mobile-tools install aurora /path/to/app.rpm
+claude-in-mobile install android /path/to/app.apk
+claude-in-mobile install ios /path/to/app.app
+claude-in-mobile install aurora /path/to/app.rpm
 ```
 
 **Platforms:** Android, iOS, Aurora
@@ -355,9 +355,9 @@ mobile-tools install aurora /path/to/app.rpm
 Remove an installed application from the device.
 
 ```bash
-mobile-tools uninstall android com.example.app
-mobile-tools uninstall ios com.example.app
-mobile-tools uninstall aurora harbour-myapp
+claude-in-mobile uninstall android com.example.app
+claude-in-mobile uninstall ios com.example.app
+claude-in-mobile uninstall aurora harbour-myapp
 ```
 
 **Platforms:** Android, iOS, Aurora
@@ -369,8 +369,8 @@ mobile-tools uninstall aurora harbour-myapp
 Copy a local file to the device filesystem.
 
 ```bash
-mobile-tools push-file android /local/path /sdcard/remote/path
-mobile-tools push-file aurora /local/file /home/user/file
+claude-in-mobile push-file android /local/path /sdcard/remote/path
+claude-in-mobile push-file aurora /local/file /home/user/file
 ```
 
 **Platforms:** Android, Aurora
@@ -382,8 +382,8 @@ mobile-tools push-file aurora /local/file /home/user/file
 Copy a file from device filesystem to local machine.
 
 ```bash
-mobile-tools pull-file android /sdcard/remote/file /local/path
-mobile-tools pull-file aurora /home/user/file /local/file
+claude-in-mobile pull-file android /sdcard/remote/file /local/path
+claude-in-mobile pull-file aurora /home/user/file /local/file
 ```
 
 **Platforms:** Android, Aurora
@@ -395,9 +395,9 @@ mobile-tools pull-file aurora /home/user/file /local/file
 Read current clipboard content from the device.
 
 ```bash
-mobile-tools get-clipboard android
-mobile-tools get-clipboard ios
-mobile-tools get-clipboard desktop --companion-path /path/to/companion
+claude-in-mobile get-clipboard android
+claude-in-mobile get-clipboard ios
+claude-in-mobile get-clipboard desktop --companion-path /path/to/companion
 ```
 
 **Platforms:** Android, iOS, Desktop
@@ -409,9 +409,9 @@ mobile-tools get-clipboard desktop --companion-path /path/to/companion
 Set clipboard content on the device.
 
 ```bash
-mobile-tools set-clipboard android "copied text"
-mobile-tools set-clipboard ios "copied text"
-mobile-tools set-clipboard desktop "text" --companion-path /path/to/companion
+claude-in-mobile set-clipboard android "copied text"
+claude-in-mobile set-clipboard ios "copied text"
+claude-in-mobile set-clipboard desktop "text" --companion-path /path/to/companion
 ```
 
 **Platforms:** Android, iOS, Desktop
@@ -423,10 +423,10 @@ mobile-tools set-clipboard desktop "text" --companion-path /path/to/companion
 Retrieve device logs. Supports line limit and filtering.
 
 ```bash
-mobile-tools logs android -l 50
-mobile-tools logs android -f "MyTag"
-mobile-tools logs ios -l 200
-mobile-tools logs aurora -l 100
+claude-in-mobile logs android -l 50
+claude-in-mobile logs android -f "MyTag"
+claude-in-mobile logs ios -l 200
+claude-in-mobile logs aurora -l 100
 ```
 
 | Flag | Description | Default |
@@ -446,9 +446,9 @@ mobile-tools logs aurora -l 100
 Clear all device logs.
 
 ```bash
-mobile-tools clear-logs android
-mobile-tools clear-logs ios
-mobile-tools clear-logs aurora
+claude-in-mobile clear-logs android
+claude-in-mobile clear-logs ios
+claude-in-mobile clear-logs aurora
 ```
 
 **Platforms:** Android, iOS, Aurora
@@ -460,9 +460,9 @@ mobile-tools clear-logs aurora
 Get device system information (battery, memory, OS version, etc.).
 
 ```bash
-mobile-tools system-info android
-mobile-tools system-info ios
-mobile-tools system-info aurora
+claude-in-mobile system-info android
+claude-in-mobile system-info ios
+claude-in-mobile system-info aurora
 ```
 
 **Platforms:** Android, iOS, Aurora
@@ -474,8 +474,8 @@ mobile-tools system-info aurora
 Get the currently displayed activity or foreground app.
 
 ```bash
-mobile-tools current-activity android
-mobile-tools current-activity ios
+claude-in-mobile current-activity android
+claude-in-mobile current-activity ios
 ```
 
 **Platforms:** Android, iOS
@@ -487,8 +487,8 @@ mobile-tools current-activity ios
 Reboot the device or restart the simulator.
 
 ```bash
-mobile-tools reboot android
-mobile-tools reboot ios
+claude-in-mobile reboot android
+claude-in-mobile reboot ios
 ```
 
 **Platforms:** Android, iOS
@@ -500,8 +500,8 @@ mobile-tools reboot ios
 Control screen power state (turn display on/off).
 
 ```bash
-mobile-tools screen on
-mobile-tools screen off
+claude-in-mobile screen on
+claude-in-mobile screen off
 ```
 
 **Platforms:** Android only
@@ -513,9 +513,9 @@ mobile-tools screen off
 Open a URL in the device's default browser.
 
 ```bash
-mobile-tools open-url android "https://example.com"
-mobile-tools open-url ios "https://example.com"
-mobile-tools open-url aurora "https://example.com"
+claude-in-mobile open-url android "https://example.com"
+claude-in-mobile open-url ios "https://example.com"
+claude-in-mobile open-url aurora "https://example.com"
 ```
 
 **Platforms:** Android, iOS, Aurora
@@ -527,9 +527,9 @@ mobile-tools open-url aurora "https://example.com"
 Execute an arbitrary shell command on the device.
 
 ```bash
-mobile-tools shell android "ls /sdcard"
-mobile-tools shell ios "ls ~/Documents"
-mobile-tools shell aurora "uname -a"
+claude-in-mobile shell android "ls /sdcard"
+claude-in-mobile shell ios "ls ~/Documents"
+claude-in-mobile shell aurora "uname -a"
 ```
 
 **Platforms:** Android, iOS, Aurora
@@ -541,8 +541,8 @@ mobile-tools shell aurora "uname -a"
 Pause execution for a specified duration. Useful in automation scripts between actions.
 
 ```bash
-mobile-tools wait 2000    # wait 2 seconds
-mobile-tools wait 500     # wait 500ms
+claude-in-mobile wait 2000    # wait 2 seconds
+claude-in-mobile wait 500     # wait 500ms
 ```
 
 **Platforms:** cross-platform (no device interaction)
@@ -554,7 +554,7 @@ mobile-tools wait 500     # wait 500ms
 List all open desktop windows with their IDs, titles, positions, and sizes.
 
 ```bash
-mobile-tools get-window-info --companion-path /path/to/companion
+claude-in-mobile get-window-info --companion-path /path/to/companion
 ```
 
 **Platforms:** Desktop only
@@ -566,7 +566,7 @@ mobile-tools get-window-info --companion-path /path/to/companion
 Bring a desktop window to front by its ID (from `get-window-info`).
 
 ```bash
-mobile-tools focus-window "window-id" --companion-path /path/to/companion
+claude-in-mobile focus-window "window-id" --companion-path /path/to/companion
 ```
 
 **Platforms:** Desktop only
@@ -578,7 +578,7 @@ mobile-tools focus-window "window-id" --companion-path /path/to/companion
 Resize a desktop window to specified width and height.
 
 ```bash
-mobile-tools resize-window "window-id" 800 600 --companion-path /path/to/companion
+claude-in-mobile resize-window "window-id" 800 600 --companion-path /path/to/companion
 ```
 
 **Platforms:** Desktop only
@@ -590,7 +590,7 @@ mobile-tools resize-window "window-id" 800 600 --companion-path /path/to/compani
 Launch a desktop application by path.
 
 ```bash
-mobile-tools launch-desktop-app /path/to/app --companion-path /path/to/companion
+claude-in-mobile launch-desktop-app /path/to/app --companion-path /path/to/companion
 ```
 
 **Platforms:** Desktop only
@@ -602,7 +602,7 @@ mobile-tools launch-desktop-app /path/to/app --companion-path /path/to/companion
 Stop a running desktop application by name.
 
 ```bash
-mobile-tools stop-desktop-app "AppName" --companion-path /path/to/companion
+claude-in-mobile stop-desktop-app "AppName" --companion-path /path/to/companion
 ```
 
 **Platforms:** Desktop only
@@ -614,7 +614,7 @@ mobile-tools stop-desktop-app "AppName" --companion-path /path/to/companion
 Get CPU/memory usage metrics for running desktop applications.
 
 ```bash
-mobile-tools get-performance-metrics --companion-path /path/to/companion
+claude-in-mobile get-performance-metrics --companion-path /path/to/companion
 ```
 
 **Platforms:** Desktop only
@@ -626,7 +626,7 @@ mobile-tools get-performance-metrics --companion-path /path/to/companion
 List connected monitors with resolutions and positions.
 
 ```bash
-mobile-tools get-monitors --companion-path /path/to/companion
+claude-in-mobile get-monitors --companion-path /path/to/companion
 ```
 
 **Platforms:** Desktop only
