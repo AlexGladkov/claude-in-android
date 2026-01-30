@@ -76,6 +76,12 @@ claude mcp add --transport stdio mobile -- cmd /c npx -y claude-in-android
 ### iOS
 - macOS with Xcode installed
 - iOS Simulator (no physical device support yet)
+- **WebDriverAgent** for full UI inspection and element-based interaction:
+  ```bash
+  npm install -g appium
+  appium driver install xcuitest
+  ```
+  Or set `WDA_PATH` environment variable to custom WebDriverAgent location
 
 ### Desktop
 - macOS (Windows/Linux support planned)
@@ -96,7 +102,7 @@ claude mcp add --transport stdio mobile -- cmd /c npx -y claude-in-android
 | `list_devices` | ✅ | ✅ | ✅ | ✅ | List all connected devices |
 | `set_device` | ✅ | ✅ | ✅ | ✅ | Select active device |
 | `screenshot` | ✅ | ✅ | ✅ | ✅ | Take screenshot |
-| `tap` | ✅ | ✅ | ✅ | ⚠️ | Tap at coordinates or by text (requires Python on Aurora) |
+| `tap` | ✅ | ✅ | ✅ | ⚠️ | Tap at coordinates or by text/label (iOS: WDA required for element tap) |
 | `long_press` | ✅ | ✅ | ✅ | ✅ | Long press gesture |
 | `swipe` | ✅ | ✅ | ✅ | ⚠️ | Swipe in direction or coordinates (requires Python on Aurora) |
 | `input_text` | ✅ | ✅ | ✅ | ❌ | Type text |
@@ -105,8 +111,8 @@ claude mcp add --transport stdio mobile -- cmd /c npx -y claude-in-android
 | `stop_app` | ✅ | ✅ | ❌ | ✅ | Stop app |
 | `install_app` | ✅ | ✅ | ❌ | ✅ | Install APK/.app/.rpm |
 | `list_apps` | ❌ | ❌ | ❌ | ✅ | List installed apps (Aurora only) |
-| `get_ui` | ✅ | ⚠️ | ✅ | ❌ | Get UI hierarchy |
-| `find_element` | ✅ | ❌ | ✅ | ❌ | Find elements by text/id |
+| `get_ui` | ✅ | ✅ | ✅ | ❌ | Get UI hierarchy (iOS: requires WebDriverAgent) |
+| `find_element` | ✅ | ✅ | ✅ | ❌ | Find elements by text/id/label (iOS: requires WebDriverAgent) |
 | `get_current_activity` | ✅ | ❌ | ❌ | ❌ | Get foreground activity |
 | `open_url` | ✅ | ✅ | ❌ | ❌ | Open URL in browser (not yet implemented on Aurora) |
 | `shell` | ✅ | ✅ | ❌ | ✅ | Run shell command |
@@ -244,7 +250,62 @@ After installing, Claude Code controls devices with natural language. The skill 
 
 See [cli/README.md](cli/README.md) for full CLI documentation.
 
----
+## iOS WebDriverAgent Setup
+
+For full iOS UI inspection and element-based interaction, WebDriverAgent is required. It enables:
+- `get_ui` - JSON accessibility tree inspection
+- `tap` with `label` or `text` parameters - Element-based tapping
+- `find_element` - Element discovery and querying
+- `swipe` - Improved gesture simulation
+
+### Installation
+
+**Automatic (via Appium):**
+```bash
+npm install -g appium
+appium driver install xcuitest
+```
+
+**Manual:**
+Set the `WDA_PATH` environment variable to your WebDriverAgent location:
+```bash
+export WDA_PATH=/path/to/WebDriverAgent
+```
+
+### First Use
+
+On first use, WebDriverAgent will be automatically:
+1. Discovered from Appium installation or `WDA_PATH`
+2. Built with xcodebuild (one-time, ~2 minutes)
+3. Launched on the iOS simulator
+4. Connected via HTTP on port 8100+
+
+### Troubleshooting
+
+**Build fails:**
+```bash
+# Install Xcode command line tools
+xcode-select --install
+
+# Accept license
+sudo xcodebuild -license accept
+
+# Set Xcode path
+sudo xcode-select -s /Applications/Xcode.app
+```
+
+**Session fails:**
+- Ensure simulator is booted: `xcrun simctl list | grep Booted`
+- Check port availability: `lsof -i :8100`
+- Try restarting the simulator
+
+**Manual test:**
+```bash
+cd ~/.appium/node_modules/appium-xcuitest-driver/node_modules/appium-webdriveragent
+xcodebuild test -project WebDriverAgent.xcodeproj \
+  -scheme WebDriverAgentRunner \
+  -destination 'platform=iOS Simulator,id=<DEVICE_UDID>'
+```
 
 ## How It Works
 
@@ -253,7 +314,7 @@ See [cli/README.md](cli/README.md) for full CLI documentation.
 │   Claude    │────▶│  Claude Mobile   │────▶│  Android (ADB)  │
 │             │     │   MCP Server     │     └─────────────────┘
 │             │     │                  │     ┌─────────────────┐
-│             │     │                  │────▶│  iOS (simctl)   │
+│             │     │                  │────▶│ iOS (simctl+WDA)│
 │             │     │                  │     └─────────────────┘
 │             │     │                  │     ┌─────────────────┐
 │             │     │                  │────▶│ Desktop (Compose)│
@@ -264,8 +325,8 @@ See [cli/README.md](cli/README.md) for full CLI documentation.
 ```
 
 1. Claude sends commands through MCP protocol
-2. Server routes to appropriate platform (ADB, simctl, Desktop companion, or audb)
-3. Commands execute on your device or desktop app (via ADB, simctl, Desktop companion, or audb)
+2. Server routes to appropriate platform (ADB, simctl+WDA, Desktop companion, or audb)
+3. Commands execute on your device or desktop app
 4. Results (screenshots, UI data, metrics) return to Claude
 
 ## License
