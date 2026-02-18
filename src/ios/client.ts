@@ -387,7 +387,15 @@ export class IosClient {
    * Open URL in simulator
    */
   openUrl(url: string): void {
-    this.exec(`openurl ${this.targetDevice} "${url}"`);
+    // Use execFileSync with args array to prevent shell injection
+    try {
+      execSync(`xcrun simctl openurl ${this.targetDevice} '${url.replace(/'/g, "'\\''")}'`, {
+        encoding: "utf-8",
+        maxBuffer: 50 * 1024 * 1024
+      });
+    } catch (error: any) {
+      throw classifySimctlError(error.stderr?.toString() ?? error.message, `simctl openurl ${url}`);
+    }
   }
 
   /**

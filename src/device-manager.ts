@@ -285,33 +285,15 @@ export class DeviceManager {
     compress: boolean = true,
     options?: CompressOptions & { monitorIndex?: number }
   ): Promise<{ data: string; mimeType: string }> {
-    const client = this.getClient(platform);
-
-    if (client instanceof DesktopClient) {
-      const result = await client.screenshotWithMeta({
-        monitorIndex: options?.monitorIndex
-      });
-      // Desktop returns JPEG already compressed
-      return { data: result.base64, mimeType: result.mimeType };
-    }
-
-    // Mobile clients
-    const buffer = (client as AdbClient | IosClient | AuroraClient).screenshotRaw();
-    if (compress) {
-      return compressScreenshot(buffer, options);
-    }
-    return { data: buffer.toString("base64"), mimeType: "image/png" };
+    // Delegate to screenshotAsync to avoid blocking event loop
+    return this.screenshotAsync(platform, compress, options);
   }
 
   /**
    * Get raw screenshot as PNG Buffer (for annotation/processing)
    */
-  getScreenshotBuffer(platform?: Platform): Buffer {
-    const client = this.getClient(platform);
-    if (client instanceof DesktopClient) {
-      throw new Error("Use screenshot() for desktop platform");
-    }
-    return (client as AdbClient | IosClient | AuroraClient).screenshotRaw();
+  async getScreenshotBuffer(platform?: Platform): Promise<Buffer> {
+    return this.getScreenshotBufferAsync(platform);
   }
 
   /**
@@ -505,7 +487,10 @@ export class DeviceManager {
     if (client instanceof IosClient) {
       return await client.getUiHierarchy();
     }
-    return (client as AdbClient | AuroraClient).getUiHierarchy();
+    if (client instanceof AdbClient) {
+      return await client.getUiHierarchyAsync();
+    }
+    return (client as AuroraClient).getUiHierarchy();
   }
 
   /**
