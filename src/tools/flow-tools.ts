@@ -7,9 +7,10 @@ import { MAX_RECURSION_DEPTH } from "./context.js";
 
 // Flow Engine constants
 const FLOW_ALLOWED_ACTIONS = new Set([
-  "tap", "swipe", "input_text", "press_key", "wait", "wait_for_element",
+  "tap", "double_tap", "swipe", "input_text", "press_key", "wait", "wait_for_element",
   "screenshot", "analyze_screen", "assert_visible", "assert_not_exists",
   "find_and_tap", "find_element", "open_url",
+  "select_text", "copy_text", "paste_text",
 ]);
 
 const FLOW_MAX_STEPS = 20;

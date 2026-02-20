@@ -99,6 +99,83 @@ export const interactionTools: ToolDefinition[] = [
   },
   {
     tool: {
+      name: "double_tap",
+      description: "Double tap at specific coordinates or find an element by text/id and double tap it",
+      inputSchema: {
+        type: "object",
+        properties: {
+          x: { type: "number", description: "X coordinate to tap" },
+          y: { type: "number", description: "Y coordinate to tap" },
+          text: { type: "string", description: "Find element by text and double tap it (Android only)" },
+          resourceId: { type: "string", description: "Find element with this resource ID and double tap it (Android only)" },
+          index: { type: "number", description: "Double tap element by index from get_ui output (Android only)" },
+          interval: { type: "number", description: "Delay between taps in milliseconds (default: 100)", default: 100 },
+          hints: { type: "boolean", description: "Return hints about what changed after the action (new/gone elements, suggestions). Eliminates need for follow-up screenshot/get_ui.", default: false },
+          platform: { type: "string", enum: ["android", "ios", "desktop", "aurora"], description: "Target platform. If not specified, uses the active target." },
+        },
+      },
+    },
+    handler: async (args, ctx) => {
+      const platform = args.platform as Platform | undefined;
+      let x: number | undefined = args.x as number;
+      let y: number | undefined = args.y as number;
+      const interval = (args.interval as number) ?? 100;
+      const currentPlatform = platform ?? ctx.deviceManager.getCurrentPlatform();
+
+      // Find by index from cached elements (Android only)
+      if (args.index !== undefined && currentPlatform === "android") {
+        const idx = args.index as number;
+        let elements = ctx.getCachedElements("android");
+        if (elements.length === 0) {
+          const xml = await ctx.deviceManager.getUiHierarchyAsync("android");
+          elements = parseUiHierarchy(xml);
+          ctx.setCachedElements("android", elements);
+        }
+        const el = elements.find(e => e.index === idx);
+        if (!el) {
+          return { text: `Element with index ${idx} not found. Run get_ui first.` };
+        }
+        x = el.centerX;
+        y = el.centerY;
+      }
+
+      // Find by text or resourceId (Android only)
+      if ((args.text || args.resourceId) && currentPlatform === "android") {
+        const xml = await ctx.deviceManager.getUiHierarchyAsync("android");
+        const elements = parseUiHierarchy(xml);
+        ctx.setCachedElements("android", elements);
+
+        let found: import("../adb/ui-parser.js").UiElement[] = [];
+        if (args.text) {
+          found = findByText(elements, args.text as string);
+        } else if (args.resourceId) {
+          found = findByResourceId(elements, args.resourceId as string);
+        }
+
+        if (found.length === 0) {
+          return { text: `Element not found: ${args.text || args.resourceId}` };
+        }
+
+        const clickable = found.filter(el => el.clickable);
+        const target = clickable[0] ?? found[0];
+        x = target.centerX;
+        y = target.centerY;
+      }
+
+      if (x === undefined || y === undefined) {
+        return { text: "Please provide x,y coordinates, text, resourceId, or index" };
+      }
+
+      await ctx.deviceManager.doubleTap(x, y, interval, platform);
+      let result = `Double tapped at (${x}, ${y}) with ${interval}ms interval`;
+      if (args.hints === true) {
+        result += await ctx.generateActionHints(platform as string | undefined);
+      }
+      return { text: result };
+    },
+  },
+  {
+    tool: {
       name: "long_press",
       description: "Long press at coordinates or on an element",
       inputSchema: {
