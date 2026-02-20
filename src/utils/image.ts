@@ -26,6 +26,12 @@ export async function compressScreenshot(
   pngBuffer: Buffer,
   options: CompressOptions = {}
 ): Promise<{ data: string; mimeType: string }> {
+  if (!pngBuffer || pngBuffer.length === 0) {
+    throw new Error(
+      "Screenshot returned empty data (0 bytes). The screen may be off — try press_key('WAKEUP') first, or the device may be disconnected."
+    );
+  }
+
   const opts = { ...DEFAULT_OPTIONS, ...options };
 
   const image = await Jimp.read(pngBuffer);

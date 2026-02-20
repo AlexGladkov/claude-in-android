@@ -5,6 +5,9 @@ import { classifyAdbError } from "../errors.js";
 const execAsyncCmd = promisify(exec);
 const execFileAsync = promisify(execFile);
 
+const EXEC_TIMEOUT_MS = 15_000;      // 15s for text commands
+const EXEC_RAW_TIMEOUT_MS = 30_000;  // 30s for binary (screenshots)
+
 export interface Device {
   id: string;
   state: string;
@@ -30,9 +33,13 @@ export class AdbClient {
     try {
       return execSync(fullCommand, {
         encoding: "utf-8",
+        timeout: EXEC_TIMEOUT_MS,
         maxBuffer: 50 * 1024 * 1024 // 50MB for screenshots
       }).trim();
     } catch (error: any) {
+      if (error.killed === true || error.signal === "SIGTERM") {
+        throw new Error(`ADB command timed out after ${EXEC_TIMEOUT_MS}ms: ${fullCommand}. Device may be disconnected or screen locked.`);
+      }
       throw classifyAdbError(error.stderr?.toString() ?? error.message, fullCommand);
     }
   }
@@ -44,9 +51,13 @@ export class AdbClient {
     const fullCommand = `adb ${this.deviceFlag} ${command}`;
     try {
       return execSync(fullCommand, {
+        timeout: EXEC_RAW_TIMEOUT_MS,
         maxBuffer: 50 * 1024 * 1024
       });
     } catch (error: any) {
+      if (error.killed === true || error.signal === "SIGTERM") {
+        throw new Error(`ADB command timed out after ${EXEC_RAW_TIMEOUT_MS}ms: ${fullCommand}. Device may be disconnected or screen locked.`);
+      }
       throw classifyAdbError(error.stderr?.toString() ?? error.message, fullCommand);
     }
   }
@@ -58,10 +69,14 @@ export class AdbClient {
     const fullCommand = `adb ${this.deviceFlag} ${command}`;
     try {
       const { stdout } = await execAsyncCmd(fullCommand, {
+        timeout: EXEC_TIMEOUT_MS,
         maxBuffer: 50 * 1024 * 1024
       });
       return stdout.trim();
     } catch (error: any) {
+      if (error.killed === true || error.signal === "SIGTERM") {
+        throw new Error(`ADB command timed out after ${EXEC_TIMEOUT_MS}ms: ${fullCommand}. Device may be disconnected or screen locked.`);
+      }
       throw classifyAdbError(error.stderr?.toString() ?? error.message, fullCommand);
     }
   }
@@ -73,14 +88,19 @@ export class AdbClient {
     const args = this.deviceId
       ? ["-s", this.deviceId, ...command.split(/\s+/)]
       : command.split(/\s+/);
+    const fullCommand = `adb ${args.join(" ")}`;
     try {
       const { stdout } = await execFileAsync("adb", args, {
+        timeout: EXEC_RAW_TIMEOUT_MS,
         maxBuffer: 50 * 1024 * 1024,
         encoding: "buffer" as any,
       });
       return stdout as unknown as Buffer;
     } catch (error: any) {
-      throw classifyAdbError(error.stderr?.toString() ?? error.message, `adb ${args.join(" ")}`);
+      if (error.killed === true || error.signal === "SIGTERM") {
+        throw new Error(`ADB command timed out after ${EXEC_RAW_TIMEOUT_MS}ms: ${fullCommand}. Device may be disconnected or screen locked.`);
+      }
+      throw classifyAdbError(error.stderr?.toString() ?? error.message, fullCommand);
     }
   }
 
@@ -140,6 +160,52 @@ export class AdbClient {
    */
   tap(x: number, y: number): void {
     this.exec(`shell input tap ${x} ${y}`);
+  }
+
+  /**
+   * Double tap at coordinates
+   */
+  doubleTap(x: number, y: number, intervalMs: number = 100): void {
+    this.exec(`shell "input tap ${x} ${y} && sleep ${(intervalMs / 1000).toFixed(2)} && input tap ${x} ${y}"`);
+  }
+
+  /**
+   * Select all text in focused input
+   */
+  selectAll(): void {
+    this.exec("shell input keyevent 256");   // MOVE_HOME
+    this.exec("shell input keyevent 268");   // SHIFT+MOVE_END
+  }
+
+  /**
+   * Copy to clipboard
+   */
+  copyToClipboard(): void {
+    this.exec("shell input keyevent 278");   // KEYCODE_COPY
+  }
+
+  /**
+   * Paste from clipboard
+   */
+  pasteFromClipboard(): void {
+    this.exec("shell input keyevent 279");   // KEYCODE_PASTE
+  }
+
+  /**
+   * Get clipboard text
+   */
+  getClipboardText(): string {
+    try {
+      return this.exec("shell cmd clipboard get-primary-clip");
+    } catch {
+      try {
+        const result = this.exec("shell am broadcast -a clipper.get");
+        const match = result.match(/data="([^"]*)"/);
+        return match?.[1] ?? "(clipboard not available)";
+      } catch {
+        return "(clipboard access not available — requires API 29+ or clipper app)";
+      }
+    }
   }
 
   /**
@@ -229,6 +295,20 @@ export class AdbClient {
       "SEARCH": 84,
       "ESCAPE": 111,
       "SPACE": 62,
+      "WAKEUP": 224,
+      "SLEEP": 223,
+      "BRIGHTNESS_UP": 221,
+      "BRIGHTNESS_DOWN": 220,
+      "MEDIA_PLAY_PAUSE": 85,
+      "MEDIA_NEXT": 87,
+      "MEDIA_PREVIOUS": 88,
+      "MEDIA_STOP": 86,
+      "MUTE": 91,
+      "NOTIFICATION": 83,
+      "SETTINGS": 176,
+      "COPY": 278,
+      "PASTE": 279,
+      "CUT": 277,
     };
 
     const keyCode = keyCodes[key.toUpperCase()] ?? parseInt(key);

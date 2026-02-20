@@ -5,6 +5,8 @@ import { readFileSync, unlinkSync } from "fs";
 import { WDAManager, WDAClient, WDAElement, WDARect } from "./wda/index.js";
 import { classifySimctlError } from "../errors.js";
 
+const EXEC_TIMEOUT_MS = 15_000;      // 15s for text commands
+
 export interface IosDevice {
   id: string;
   name: string;
@@ -45,9 +47,13 @@ export class IosClient {
     try {
       return execSync(fullCommand, {
         encoding: "utf-8",
+        timeout: EXEC_TIMEOUT_MS,
         maxBuffer: 50 * 1024 * 1024
       }).trim();
     } catch (error: any) {
+      if (error.killed === true || error.signal === "SIGTERM") {
+        throw new Error(`simctl command timed out after ${EXEC_TIMEOUT_MS}ms: ${fullCommand}. Simulator may be unresponsive.`);
+      }
       throw classifySimctlError(error.stderr?.toString() ?? error.message, fullCommand);
     }
   }
@@ -242,12 +248,12 @@ export class IosClient {
 
     // Use simctl io for button presses
     if (mappedKey === "home") {
-      execSync(`xcrun simctl io ${this.targetDevice} enumerate`, { encoding: "utf-8" });
+      execSync(`xcrun simctl io ${this.targetDevice} enumerate`, { encoding: "utf-8", timeout: EXEC_TIMEOUT_MS });
       // Trigger home button via keyboard shortcut
-      execSync(`osascript -e 'tell application "Simulator" to activate' -e 'tell application "System Events" to keystroke "h" using {command down, shift down}'`, { encoding: "utf-8" });
+      execSync(`osascript -e 'tell application "Simulator" to activate' -e 'tell application "System Events" to keystroke "h" using {command down, shift down}'`, { encoding: "utf-8", timeout: EXEC_TIMEOUT_MS });
     } else {
       // Try generic approach
-      execSync(`osascript -e 'tell application "Simulator" to activate'`, { encoding: "utf-8" });
+      execSync(`osascript -e 'tell application "Simulator" to activate'`, { encoding: "utf-8", timeout: EXEC_TIMEOUT_MS });
     }
   }
 
@@ -391,6 +397,7 @@ export class IosClient {
     try {
       execSync(`xcrun simctl openurl ${this.targetDevice} '${url.replace(/'/g, "'\\''")}'`, {
         encoding: "utf-8",
+        timeout: EXEC_TIMEOUT_MS,
         maxBuffer: 50 * 1024 * 1024
       });
     } catch (error: any) {
@@ -465,7 +472,7 @@ export class IosClient {
       try {
         return execSync(
           `xcrun simctl spawn ${this.targetDevice} log show --style compact --last 1m 2>/dev/null | tail -100`,
-          { encoding: "utf-8", maxBuffer: 10 * 1024 * 1024 }
+          { encoding: "utf-8", timeout: EXEC_TIMEOUT_MS, maxBuffer: 10 * 1024 * 1024 }
         );
       } catch {
         return "Unable to retrieve logs. Make sure the simulator is running.";
