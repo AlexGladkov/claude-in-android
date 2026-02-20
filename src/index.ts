@@ -7,7 +7,7 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 
-import { registerTools, getTools, getHandler } from "./tools/registry.js";
+import { registerTools, registerAliases, getTools, getHandler } from "./tools/registry.js";
 import { createToolContext, MAX_RECURSION_DEPTH } from "./tools/context.js";
 import { deviceTools } from "./tools/device-tools.js";
 import { screenshotTools } from "./tools/screenshot-tools.js";
@@ -19,6 +19,7 @@ import { systemTools } from "./tools/system-tools.js";
 import { desktopTools } from "./tools/desktop-tools.js";
 import { auroraTools } from "./tools/aurora-tools.js";
 import { flowTools } from "./tools/flow-tools.js";
+import { clipboardTools } from "./tools/clipboard-tools.js";
 
 // Dispatch function (needed by batch_commands / run_flow for recursion)
 async function handleTool(name: string, args: Record<string, unknown>, depth: number = 0): Promise<unknown> {
@@ -49,7 +50,18 @@ registerTools([
   ...desktopTools,
   ...auroraTools,
   ...flowTools,
+  ...clipboardTools,
 ]);
+
+// Register hidden aliases for common LLM misnaming
+registerAliases({
+  "press_button": "press_key",
+  "type_text": "input_text",
+  "type": "input_text",
+  "click": "tap",
+  "long_tap": "long_press",
+  "take_screenshot": "screenshot",
+});
 
 // Create MCP server
 const server = new Server(

@@ -7,10 +7,17 @@ export interface ToolDefinition {
 }
 
 const toolMap = new Map<string, ToolDefinition>();
+const aliasMap = new Map<string, string>();
 
 export function registerTools(defs: ToolDefinition[]): void {
   for (const def of defs) {
     toolMap.set(def.tool.name, def);
+  }
+}
+
+export function registerAliases(aliases: Record<string, string>): void {
+  for (const [alias, canonical] of Object.entries(aliases)) {
+    aliasMap.set(alias, canonical);
   }
 }
 
@@ -19,5 +26,11 @@ export function getTools(): Tool[] {
 }
 
 export function getHandler(name: string): ToolDefinition["handler"] | undefined {
-  return toolMap.get(name)?.handler;
+  const direct = toolMap.get(name);
+  if (direct) return direct.handler;
+
+  const canonical = aliasMap.get(name);
+  if (canonical) return toolMap.get(canonical)?.handler;
+
+  return undefined;
 }
