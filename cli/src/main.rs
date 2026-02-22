@@ -38,16 +38,16 @@ enum Commands {
         #[arg(short, long, default_value = "false")]
         compress: bool,
 
-        /// Max width for compression (default: 1024)
-        #[arg(long, default_value = "1024")]
+        /// Max width for compression (default: 540)
+        #[arg(long, default_value = "540")]
         max_width: u32,
 
-        /// Max height for compression (default: unlimited)
-        #[arg(long)]
+        /// Max height for compression (default: 960)
+        #[arg(long, default_value = "960")]
         max_height: Option<u32>,
 
-        /// JPEG quality for compression (1-100, default: 80)
-        #[arg(long, default_value = "80")]
+        /// JPEG quality for compression (1-100, default: 55)
+        #[arg(long, default_value = "55")]
         quality: u8,
 
         /// iOS Simulator name (default: booted)

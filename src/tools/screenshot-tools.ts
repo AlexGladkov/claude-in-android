@@ -4,6 +4,26 @@ import type { Platform } from "../device-manager.js";
 import { annotateScreenshot, compareScreenshots, cropRegion, compressScreenshot } from "../utils/image.js";
 import { parseUiHierarchy, UiElement } from "../adb/ui-parser.js";
 
+const STABLE_INTERVAL_MS = 300;
+const STABLE_MAX_RETRIES = 3;
+const STABLE_THRESHOLD_PERCENT = 2;
+
+async function waitForStableScreenshot(
+  getBuffer: () => Promise<Buffer>,
+): Promise<Buffer> {
+  let prev = await getBuffer();
+  for (let i = 0; i < STABLE_MAX_RETRIES; i++) {
+    await new Promise((resolve) => setTimeout(resolve, STABLE_INTERVAL_MS));
+    const next = await getBuffer();
+    const diff = await compareScreenshots(prev, next, 30);
+    if (diff.changePercent < STABLE_THRESHOLD_PERCENT) {
+      return next;
+    }
+    prev = next;
+  }
+  return prev; // Return last capture even if not fully stable
+}
+
 export const screenshotTools: ToolDefinition[] = [
   {
     tool: {
@@ -24,18 +44,18 @@ export const screenshotTools: ToolDefinition[] = [
           },
           maxWidth: {
             type: "number",
-            description: "Max width in pixels (default: 800, max 2000 for API)",
-            default: 800,
+            description: "Max width in pixels (default: 540). Lower values reduce token cost. Max 2000 for API.",
+            default: 540,
           },
           maxHeight: {
             type: "number",
-            description: "Max height in pixels (default: 1400, max 2000 for API)",
-            default: 1400,
+            description: "Max height in pixels (default: 960). Lower values reduce token cost. Max 2000 for API.",
+            default: 960,
           },
           quality: {
             type: "number",
-            description: "JPEG quality 1-100 (default: 70)",
-            default: 70,
+            description: "JPEG quality 1-100 (default: 55). Lower = smaller size, faster processing.",
+            default: 55,
           },
           monitorIndex: {
             type: "number",
@@ -51,6 +71,11 @@ export const screenshotTools: ToolDefinition[] = [
             description: "Pixel difference threshold 0-255 for diff mode (default: 30). Lower = more sensitive.",
             default: 30,
           },
+          waitForStable: {
+            type: "boolean",
+            description: "Wait for UI to stabilize before capturing. Takes two captures ~300ms apart and compares them; retries up to 3 times until change < 2%. Useful after navigation or animations.",
+            default: false,
+          },
         },
       },
     },
@@ -58,6 +83,7 @@ export const screenshotTools: ToolDefinition[] = [
       const platform = args.platform as Platform | undefined;
       const compress = args.compress !== false;
       const diffMode = args.diff === true;
+      const stableMode = args.waitForStable === true;
       const diffThreshold = (args.diffThreshold as number) ?? 30;
       const compressOptions = {
         maxWidth: args.maxWidth as number | undefined,
@@ -67,8 +93,12 @@ export const screenshotTools: ToolDefinition[] = [
       };
       const currentPlatform = platform ?? ctx.deviceManager.getCurrentPlatform() ?? "android";
 
+      const captureBuffer = () => ctx.deviceManager.getScreenshotBufferAsync(currentPlatform);
+
       if (diffMode) {
-        const pngBuffer = await ctx.deviceManager.getScreenshotBufferAsync(currentPlatform);
+        const pngBuffer = stableMode
+          ? await waitForStableScreenshot(captureBuffer)
+          : await captureBuffer();
         const prevBuffer = ctx.lastScreenshotMap.get(currentPlatform);
         ctx.lastScreenshotMap.set(currentPlatform, pngBuffer);
 
@@ -108,16 +138,15 @@ export const screenshotTools: ToolDefinition[] = [
         };
       }
 
-      // Standard screenshot (non-diff)
-      const result = await ctx.deviceManager.screenshotAsync(platform, compress, compressOptions);
+      // Standard screenshot (non-diff) — single capture, reuse buffer
+      const pngBuffer = stableMode
+        ? await waitForStableScreenshot(captureBuffer)
+        : await captureBuffer();
+      ctx.lastScreenshotMap.set(currentPlatform, pngBuffer);
 
-      // Store raw buffer for future diffs
-      try {
-        const rawBuffer = await ctx.deviceManager.getScreenshotBufferAsync(currentPlatform);
-        ctx.lastScreenshotMap.set(currentPlatform, rawBuffer);
-      } catch (cacheErr: any) {
-        console.error(`[screenshot cache] Failed to cache raw buffer: ${cacheErr?.message}`);
-      }
+      const result = compress
+        ? await compressScreenshot(pngBuffer, compressOptions)
+        : { data: pngBuffer.toString("base64"), mimeType: "image/png" };
 
       return {
         image: {
@@ -141,18 +170,18 @@ export const screenshotTools: ToolDefinition[] = [
           },
           maxWidth: {
             type: "number",
-            description: "Max width in pixels (default: 800)",
-            default: 800,
+            description: "Max width in pixels (default: 540). Lower values reduce token cost. Max 2000 for API.",
+            default: 540,
           },
           maxHeight: {
             type: "number",
-            description: "Max height in pixels (default: 1400)",
-            default: 1400,
+            description: "Max height in pixels (default: 960). Lower values reduce token cost. Max 2000 for API.",
+            default: 960,
           },
           quality: {
             type: "number",
-            description: "JPEG quality 1-100 (default: 70)",
-            default: 70,
+            description: "JPEG quality 1-100 (default: 55). Lower = smaller size, faster processing.",
+            default: 55,
           },
         },
       },
@@ -181,7 +210,7 @@ export const screenshotTools: ToolDefinition[] = [
       }
 
       if (uiElements.length === 0) {
-        const result = await ctx.deviceManager.screenshotAsync(currentPlat, true, {
+        const result = await compressScreenshot(pngBuffer, {
           maxWidth: args.maxWidth as number | undefined,
           maxHeight: args.maxHeight as number | undefined,
           quality: args.quality as number | undefined,

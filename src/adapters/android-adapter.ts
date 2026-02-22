@@ -14,6 +14,7 @@ export class AndroidAdapter implements PlatformAdapter {
 
   constructor(client?: AdbClient) {
     this.client = client ?? new AdbClient();
+    this._selectedDeviceId = this.client.getDeviceId();
   }
 
   /** Raw client access — needed by tools that call getAndroidClient(). */

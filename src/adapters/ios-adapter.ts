@@ -14,6 +14,7 @@ export class IosAdapter implements PlatformAdapter {
 
   constructor(client?: IosClient) {
     this.client = client ?? new IosClient();
+    this._selectedDeviceId = this.client.getDeviceId();
   }
 
   /** Raw client access — needed by tools that call getIosClient(). */

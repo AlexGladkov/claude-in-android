@@ -108,6 +108,13 @@ export class IosClient {
   }
 
   /**
+   * Get currently configured device ID
+   */
+  getDeviceId(): string | undefined {
+    return this.deviceId;
+  }
+
+  /**
    * Boot simulator
    */
   boot(deviceId?: string): void {

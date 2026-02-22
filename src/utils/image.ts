@@ -9,10 +9,10 @@ export interface CompressOptions {
 }
 
 const DEFAULT_OPTIONS: CompressOptions = {
-  maxWidth: 800,    // Safe for API limit of 2000px
-  maxHeight: 1400,  // Safe for API limit of 2000px
-  quality: 70,
-  maxSizeBytes: 1024 * 1024, // 1MB max for base64 (safe margin for API)
+  maxWidth: 540,     // Optimized for LLM token efficiency (API limit: 2000px)
+  maxHeight: 960,    // Preserves ~9:16 aspect ratio at reduced resolution
+  quality: 55,       // Good balance of clarity vs size for UI screenshots
+  maxSizeBytes: 512 * 1024, // 512KB — sufficient for LLM consumption
 };
 
 /**

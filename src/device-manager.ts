@@ -13,8 +13,8 @@ import { IosAdapter } from "./adapters/ios-adapter.js";
 import { DesktopAdapter } from "./adapters/desktop-adapter.js";
 import { AuroraAdapter } from "./adapters/aurora-adapter.js";
 
-import type { AdbClient } from "./adb/client.js";
-import type { IosClient } from "./ios/client.js";
+import { AdbClient } from "./adb/client.js";
+import { IosClient } from "./ios/client.js";
 import { DesktopClient } from "./desktop/client.js";
 import type { AuroraClient } from "./aurora/index.js";
 import type { CompressOptions } from "./utils/image.js";
@@ -42,8 +42,17 @@ export class DeviceManager {
   private activeTarget: Platform = "android";
 
   constructor() {
-    this.androidAdapter = new AndroidAdapter();
-    this.iosAdapter = new IosAdapter();
+    const androidDeviceId = process.env.DEVICE_ID ?? process.env.ANDROID_SERIAL ?? undefined;
+    const iosDeviceId = process.env.IOS_DEVICE_ID ?? undefined;
+
+    this.androidAdapter = androidDeviceId
+      ? new AndroidAdapter(new AdbClient(androidDeviceId))
+      : new AndroidAdapter();
+
+    this.iosAdapter = iosDeviceId
+      ? new IosAdapter(new IosClient(iosDeviceId))
+      : new IosAdapter();
+
     this.desktopAdapter = new DesktopAdapter();
     this.auroraAdapter = new AuroraAdapter();
 
@@ -53,6 +62,13 @@ export class DeviceManager {
       ["desktop", this.desktopAdapter],
       ["aurora", this.auroraAdapter],
     ]);
+
+    // If env var specified a device, set it as active target
+    if (androidDeviceId) {
+      this.activeTarget = "android";
+    } else if (iosDeviceId) {
+      this.activeTarget = "ios";
+    }
   }
 
   /**
