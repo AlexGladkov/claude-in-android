@@ -22,10 +22,19 @@ const DEFAULT_OPTIONS: CompressOptions = {
  * - Iteratively reduce quality if still too large
  * Returns base64 encoded JPEG
  */
+export interface CompressResult {
+  data: string;
+  mimeType: string;
+  width: number;
+  height: number;
+  originalWidth: number;
+  originalHeight: number;
+}
+
 export async function compressScreenshot(
   pngBuffer: Buffer,
   options: CompressOptions = {}
-): Promise<{ data: string; mimeType: string }> {
+): Promise<CompressResult> {
   if (!pngBuffer || pngBuffer.length === 0) {
     throw new Error(
       "Screenshot returned empty data (0 bytes). The screen may be off — try press_key('WAKEUP') first, or the device may be disconnected."
@@ -82,12 +91,18 @@ export async function compressScreenshot(
     const smallerHeight = Math.round(newHeight * scaleFactor);
 
     image.resize({ w: smallerWidth, h: smallerHeight });
+    newWidth = smallerWidth;
+    newHeight = smallerHeight;
     jpegBuffer = await image.getBuffer("image/jpeg", { quality: 50 });
   }
 
   return {
     data: jpegBuffer.toString("base64"),
     mimeType: "image/jpeg",
+    width: newWidth,
+    height: newHeight,
+    originalWidth: width,
+    originalHeight: height,
   };
 }
 
@@ -378,7 +393,7 @@ function getElementLabel(el: UiElement): string {
 }
 
 export interface AnnotateResult {
-  image: { data: string; mimeType: string };
+  image: CompressResult;
   elements: Array<{
     index: number;
     label: string;

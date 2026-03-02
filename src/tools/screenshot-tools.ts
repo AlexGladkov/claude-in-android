@@ -144,15 +144,22 @@ export const screenshotTools: ToolDefinition[] = [
         : await captureBuffer();
       ctx.lastScreenshotMap.set(currentPlatform, pngBuffer);
 
-      const result = compress
-        ? await compressScreenshot(pngBuffer, compressOptions)
-        : { data: pngBuffer.toString("base64"), mimeType: "image/png" };
+      if (!compress) {
+        return {
+          image: { data: pngBuffer.toString("base64"), mimeType: "image/png" },
+        };
+      }
+
+      const result = await compressScreenshot(pngBuffer, compressOptions);
+      const scaleX = result.originalWidth / result.width;
+      const scaleY = result.originalHeight / result.height;
+      const scaled = scaleX !== 1 || scaleY !== 1;
 
       return {
-        image: {
-          data: result.data,
-          mimeType: result.mimeType,
-        },
+        image: { data: result.data, mimeType: result.mimeType },
+        text: scaled
+          ? `Screenshot: ${result.width}x${result.height} (device: ${result.originalWidth}x${result.originalHeight}, scaleX: ${scaleX.toFixed(2)}, scaleY: ${scaleY.toFixed(2)}). When tapping, multiply screenshot coordinates by scale factors to get device coordinates.`
+          : undefined,
       };
     },
   },
